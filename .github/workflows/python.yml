@@ -1,0 +1,34 @@
+---
+# .github/workflows/python.yml
+
+name: Python CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install poetry
+          poetry lock
+          poetry install
+      - name: Format check with Black
+        run: |
+          source venv/bin/activate
+          black --check scripts/
+      - name: Lint with Pylint
+        run: |
+          source venv/bin/activate
+          pylint $(git ls-files '*.py')
+        continue-on-error: true

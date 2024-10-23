@@ -1,0 +1,11 @@
+---
+# .github/ISSUE_TEMPLATE/config.yml
+
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub CICD Template Community Support
+    url: https://github.com/JuanVilla424/github-cicd-template/discussions
+    about: Please ask and answer questions here.
+  - name: GitHub CICD Template Security Reports
+    url: https://juanvilla424.github.io/github-cicd-template/SECURITY
+    about: Please report security vulnerabilities here.

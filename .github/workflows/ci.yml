@@ -1,0 +1,80 @@
+---
+# .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install poetry
+          poetry lock
+          poetry install
+      - name: Format check with Black
+        run: |
+          source venv/bin/activate
+          black --check scripts/
+      - name: Lint with Pylint
+        run: |
+          source venv/bin/activate
+          pylint $(git ls-files '*.py')
+      - name: Run tests
+        run: |
+          source venv/bin/activate
+          pytest --cov=app --cov-report=xml:coverage.xml || [$? -eq 5]
+        continue-on-error: true
+      - name: List files to verify coverage.xml
+        run: |
+          ls -la *.xml
+          cat *.xml
+        continue-on-error: true
+      - name: Upload coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+        continue-on-error: true
+      - name: OSSF Scorecard action
+        uses: ossf/scorecard-action@v2.4.0
+        with:
+          results_file: scoreboard-results.json
+          results_format: json
+          #publish_results: true
+        continue-on-error: true
+      - name: List files to verify scoreboard-results.json
+        run: |
+          ls -la scoreboard-results.json
+          cat scoreboard-results.json
+        continue-on-error: true
+      - name: Upload Scorecard Results to Security Scorecards API
+        if: always()
+        run: |
+          curl -X POST \
+            "" \
+            -H "Authorization: Bearer ${{ secrets.SCORECARD_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d @scoreboard-results.json
+        continue-on-error: true
