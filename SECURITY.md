@@ -28,7 +28,7 @@ If you discover a security vulnerability within this project, please follow thes
 
 1. **Do not create a public issue.** Instead, contact us directly to responsibly disclose the vulnerability.
 
-2. **Email** [juan.villa@quipux.com](mailto:juan.villa@quipux.com) with the following information:
+2. **Email** [r6ty5r296it6tl4eg5m.constant214@passinbox.com](mailto:r6ty5r296it6tl4eg5m.constant214@passinbox.com) with the following information:
 
    - A description of the vulnerability.
    - Steps to reproduce the issue.
