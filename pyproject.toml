@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scripts"
-version = "1.0.1"
+version = "1.0.3"
 description = "CICD Core Scripts"
 authors = ["B <g46327wsj1.marbling129@passinbox.com>"]
 license = "Apache 2.0"
@@ -12,7 +12,7 @@ python = "^3.12"
 setuptools = "^75.2.0"
 idna="^3.0"
 certifi="^2024.8.30"
-bump2version="^1.0.1"
+bump2version="^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.0"
