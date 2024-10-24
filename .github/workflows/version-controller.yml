@@ -60,7 +60,7 @@ jobs:
         id: add_modules
         run: |
           ls -la
-          git submodule add -b ${{ steps.determine_branch.outputs.current_branch }} https://github.com/JuanVilla424/scripts.git
+          git submodule add --force -b ${{ steps.determine_branch.outputs.current_branch }} https://github.com/JuanVilla424/scripts.git
 #      - name: Run Changelog Generator
 #        id: run_changelog
 #        run: |
