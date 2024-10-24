@@ -1,4 +1,4 @@
-# 🧰 Scripts Repository
+# 🗄️ Scripts Repository
 
 This repository contains a collection of base Python scripts that are invoked by the CI/CD processes of other repositories, especially the template repository. These scripts are used for formatting, checking files, version control, and updating the year in file headers or documentation.
 

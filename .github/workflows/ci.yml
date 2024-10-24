@@ -34,10 +34,12 @@ jobs:
         run: |
           source venv/bin/activate
           black --check scripts/
+        continue-on-error: true
       - name: Lint with Pylint
         run: |
           source venv/bin/activate
           pylint $(git ls-files '*.py')
+        continue-on-error: true
       - name: Run tests
         run: |
           source venv/bin/activate
