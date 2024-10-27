@@ -2,121 +2,320 @@
 """
 commit_msg_version_bump.py
 
-A script to bump the version in pyproject.toml based on commit message keywords.
-Handles major, minor, and patch releases.
+A script to bump the version in pyproject.toml based on the latest commit message.
+Changes the commit message to include the version bump and adds an icon.
+Ensures that changes are committed in a single step.
 
 Usage:
-    commit_msg_version_bump.py <commit_msg_file>
+    commit_msg_version_bump.py [--log-level {INFO,DEBUG}]
 """
 
-import sys
+import argparse
+import logging
 import re
 import subprocess
+import sys
+from logging.handlers import RotatingFileHandler
+from typing import Optional
+
 import toml
 
-DEBUG = False
+# Mapping of commit types to icons
+TYPE_MAPPING = {
+    "feat": "✨",
+    "fix": "🐛",
+    "docs": "📝",
+    "style": "💄",
+    "refactor": "♻️",
+    "perf": "⚡️",
+    "test": "✅",
+    "chore": "🔧",
+}
+
+# Mapping of commit types to version bump parts
+VERSION_BUMP_MAPPING = {
+    "feat": "minor",
+    "fix": "patch",
+    "docs": "patch",
+    "style": "patch",
+    "refactor": "patch",
+    "perf": "patch",
+    "test": "patch",
+    "chore": "patch",
+}
+
+# Regular expressions for detecting commit types and versioning keywords
+COMMIT_TYPE_REGEX = re.compile(
+    r"^(?P<type>feat|fix|docs|style|refactor|perf|test|chore)", re.IGNORECASE
+)
+VERSION_KEYWORD_REGEX = re.compile(
+    r"\[(?P<keyword>major candidate|minor candidate|patch candidate)]$", re.IGNORECASE
+)
+
+# Initialize the logger
+logger = logging.getLogger(__name__)
+
+
+def parse_arguments() -> argparse.Namespace:
+    """
+    Parses command-line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description=(
+            "Bump the version in pyproject.toml based on the latest commit message. "
+            "Adds icons to commit messages depending on their type."
+        )
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["INFO", "DEBUG"],
+        default="INFO",
+        help="Set the logging level. Default is INFO.",
+    )
+    return parser.parse_args()
+
+
+def configure_logger(log_level: str) -> None:
+    """
+    Configures logging for the script.
+
+    Args:
+        log_level (str): Logging level as a string (e.g., 'INFO', 'DEBUG').
+    """
+    numeric_level = getattr(logging, log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f"Invalid log level: {log_level}")
+
+    logger.setLevel(numeric_level)
+
+    # Set up log rotation: max size 5MB, keep 5 backup files
+    file_handler = RotatingFileHandler(
+        "commit_msg_version.log", maxBytes=5 * 1024 * 1024, backupCount=5
+    )
+    console_handler = logging.StreamHandler()
+
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    logger.handlers.clear()
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+
+def get_latest_commit_message() -> str:
+    """
+    Retrieves the latest commit message.
+
+    Returns:
+        str: The latest commit message.
+    """
+    try:
+        message = subprocess.run(
+            ["git", "log", "-1", "--pretty=%B"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ).stdout.strip()
+        logger.debug(f"Latest commit message: {message}")
+        return message
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error retrieving latest commit message: {e.stderr}")
+        sys.exit(1)
+
+
+def get_current_version(pyproject_path: str = "pyproject.toml") -> str:
+    """
+    Retrieves the current version from pyproject.toml.
+
+    Args:
+        pyproject_path (str): Path to the pyproject.toml file.
+
+    Returns:
+        str: The current version string.
+    """
+    try:
+        with open(pyproject_path, "r", encoding="utf-8") as file:
+            data = toml.load(file)
+        version = data["tool"]["poetry"]["version"]
+        logger.debug(f"Current version: {version}")
+        return version
+    except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError) as e:
+        logger.error(f"Error retrieving the version from {pyproject_path}: {e}")
+        sys.exit(1)
+
+
+def get_new_version(pyproject_path: str = "pyproject.toml") -> str:
+    """
+    Retrieves the new version from pyproject.toml after bump.
+
+    Args:
+        pyproject_path (str): Path to the pyproject.toml file.
+
+    Returns:
+        str: The new version string.
+    """
+    try:
+        with open(pyproject_path, "r", encoding="utf-8") as file:
+            data = toml.load(file)
+        new_version = data["tool"]["poetry"]["version"]
+        logger.debug(f"New version: {new_version}")
+        return new_version
+    except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError) as e:
+        logger.error(f"Error retrieving the new version from {pyproject_path}: {e}")
+        sys.exit(1)
+
+
+def add_icon_and_prepare_commit_message(
+    commit_type: str, current_version: str, new_version: str
+) -> str:
+    """
+    Prepares the new commit message with the icon and version bump.
+
+    Args:
+        commit_type (str): The type of the commit (e.g., 'chore', 'fix').
+        current_version (str): The current version before bump.
+        new_version (str): The new version after bump.
+
+    Returns:
+        str: The new commit message.
+    """
+    icon = TYPE_MAPPING.get(commit_type.lower(), "")
+    new_commit_msg = f"{icon} Bump version: {current_version} → {new_version}"
+    logger.debug(f"New commit message: {new_commit_msg}")
+    return new_commit_msg
 
 
 def bump_version(part: str) -> None:
     """
-    Bumps the specified part of the version using bump2version and commits the change.
+    Bumps the specified part of the version using bump2version.
 
     Args:
         part (str): The part of the version to bump ('major', 'minor', 'patch').
 
     Raises:
-        subprocess.CalledProcessError: If bump2version or git commands fail.
+        subprocess.CalledProcessError: If bump2version fails.
     """
     try:
         subprocess.run(["bump2version", part], check=True)
-        print(f"Successfully bumped the {part} version.")
-    except subprocess.CalledProcessError:
-        print(f"Failed to bump the {part} version.")
-        sys.exit(1)
-
-    # Retrieve the new version from pyproject.toml
-    new_version = get_new_version()
-
-    if DEBUG:
-        print(f"Target version {new_version}")
-
-    # Stage the changed pyproject.toml
-    try:
-        subprocess.run(["git", "add", "pyproject.toml"], check=True)
-    except subprocess.CalledProcessError:
-        print("Failed to stage pyproject.toml.")
-        sys.exit(1)
-
-    # Commit the change
-    try:
-        subprocess.run(["git", "commit", "-m", f"Bump {part} version to {new_version}"], check=True)
-        print(f"Committed the bumped {part} version to {new_version}.")
-    except subprocess.CalledProcessError:
-        print(f"Failed to commit the bumped {part} version.")
+        logger.info(f"Successfully bumped the {part} version.")
+    except subprocess.CalledProcessError as error:
+        logger.error(f"Failed to bump the {part} version: {error}")
         sys.exit(1)
 
 
-def get_new_version() -> str:
+def stage_changes(pyproject_path: str = "pyproject.toml") -> None:
     """
-    Retrieves the new version from pyproject.toml.
+    Stages the specified file for commit.
 
-    Returns:
-        str: The new version string.
+    Args:
+        pyproject_path (str): Path to the file to stage.
+    """
+    try:
+        subprocess.run(["git", "add", pyproject_path], check=True)
+        logger.debug(f"Staged {pyproject_path} for commit.")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to stage {pyproject_path}: {e}")
+        sys.exit(1)
+
+
+def amend_commit(new_commit_msg: str) -> None:
+    """
+    Amends the current commit with the new commit message.
+
+    Args:
+        new_commit_msg (str): The new commit message.
 
     Raises:
-        SystemExit: If the version cannot be retrieved.
+        subprocess.CalledProcessError: If git amend fails.
     """
-    pyproject_path = "pyproject.toml"
     try:
-        with open(pyproject_path, "r", encoding="utf-8") as file:
-            data = toml.load(file)
-        version = data["tool"]["poetry"]["version"]
-        return version
-    except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError):
-        print(f"Error: Unable to retrieve the version from {pyproject_path}.")
+        # Amend the commit with the new commit message
+        subprocess.run(["git", "commit", "--amend", "-m", new_commit_msg], check=True)
+        logger.info("Successfully amended the commit with the new version bump.")
+        logger.info(
+            "Please perform a force push using 'git push --force' to update the remote repository."
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to amend the commit: {e}")
         sys.exit(1)
 
 
 def main() -> None:
     """
-    Main function to parse the commit message and perform version bumping.
+    Main function to parse the latest commit message, add an icon, perform version bumping, and amend the commit.
     """
-    if DEBUG:
-        print(f"Sys: {sys}")
+    args = parse_arguments()
+    configure_logger(args.log_level)
 
-    if len(sys.argv) < 2:
-        print("Usage: commit_msg_version_bump.py <commit_msg_file>")
-        sys.exit(1)
+    latest_commit_msg = get_latest_commit_message()
 
-    commit_msg_file = sys.argv[1]
-
-    try:
-        with open(commit_msg_file, "r", encoding="utf-8") as file:
-            commit_msg = file.read().strip()
-    except FileNotFoundError:
-        print(f"Commit message file not found: {commit_msg_file}")
-        sys.exit(1)
-
-    if DEBUG:
-        print(f"Commit message file: {commit_msg_file}")
-        print(f"commit_msg: {commit_msg}")
-
-    # Define patterns for candidate types
-    major_pattern = re.compile(r"\bmajor candidate\b", re.IGNORECASE)
-    minor_pattern = re.compile(r"\bminor candidate\b", re.IGNORECASE)
-    patch_pattern = re.compile(r"\bpatch candidate\b", re.IGNORECASE)
-
-    if major_pattern.search(commit_msg):
-        print("Major candidate release detected. Bumping major version...")
-        bump_version("major")
-    elif minor_pattern.search(commit_msg):
-        print("Minor candidate release detected. Bumping minor version...")
-        bump_version("minor")
-    elif patch_pattern.search(commit_msg):
-        print("Patch candidate release detected. Bumping patch version...")
-        bump_version("patch")
+    type_match = COMMIT_TYPE_REGEX.match(latest_commit_msg)
+    if type_match:
+        commit_type = type_match.group("type")
+        logger.debug(f"Detected commit type: {commit_type}")
     else:
-        print("No version bump detected in commit message.")
+        commit_type = "chore"  # Default to 'chore' if no type is found
+        logger.debug("No commit type detected. Defaulting to 'chore'.")
+
+    version_bump_part = determine_version_bump(latest_commit_msg)
+
+    if version_bump_part:
+        logger.info(f"Version bump detected: {version_bump_part}")
+
+        current_version = get_current_version()
+
+        bump_version(version_bump_part)
+
+        new_version = get_new_version()
+
+        updated_commit_msg = add_icon_and_prepare_commit_message(
+            commit_type, current_version, new_version
+        )
+
+        # Stage the updated pyproject.toml
+        stage_changes()
+
+        amend_commit(updated_commit_msg)
+
+        logger.info(
+            "Aborting the current push. Please perform a force push using 'git push --force'."
+        )
+        sys.exit(1)
+    else:
+        logger.info("No version bump detected in commit message.")
+
+
+def determine_version_bump(commit_msg: str) -> Optional[str]:
+    """
+    Determines the version bump part based on the commit message.
+
+    Args:
+        commit_msg (str): The commit message.
+
+    Returns:
+        Optional[str]: The version part to bump ('major', 'minor', 'patch') or None.
+    """
+    match = VERSION_KEYWORD_REGEX.search(commit_msg)
+    if match:
+        keyword = match.group("keyword").lower()
+        if "major" in keyword:
+            return "major"
+        elif "minor" in keyword:
+            return "minor"
+        elif "patch" in keyword:
+            return "patch"
+    else:
+        # Fallback based on commit type
+        type_match = COMMIT_TYPE_REGEX.match(commit_msg)
+        if type_match:
+            commit_type = type_match.group("type").lower()
+            return VERSION_BUMP_MAPPING.get(commit_type)
+    return None
 
 
 if __name__ == "__main__":
