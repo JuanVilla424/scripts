@@ -240,35 +240,29 @@ def main() -> None:
         if not validate_commit_message(commit_msg):
             logger.error("Commit message validation failed. Aborting commit.")
             sys.exit(1)
+        logger.debug("Commit message does not contain square brackets. Proceeding to add icon.")
 
-        # Check if the commit message contains square brackets
-        if not has_square_brackets(commit_msg):
-            logger.debug("Commit message does not contain square brackets. Proceeding to add icon.")
-
-            # Determine the type of commit to get the appropriate icon
-            type_match = COMMIT_TYPE_REGEX.match(commit_msg)
-            if type_match:
-                commit_type = type_match.group("type")
-                logger.debug(f"Detected commit type: {commit_type}")
-            else:
-                commit_type = "chore"  # Default to 'chore' if no type is found
-                logger.debug("No commit type detected. Defaulting to 'chore'.")
-                sys.exit(1)
-
-            # Add the icon to the existing commit message
-            updated_commit_msg = add_icon_to_commit_message(commit_type, commit_msg)
-
-            # Write the updated commit message back to the file
-            amend_commit(updated_commit_msg)
-
-            # Inform the user and abort the commit to allow them to review the amended message
-            logger.info(
-                "Commit message has been updated with an icon. Please review and finalize the commit."
-            )
-            sys.exit(1)
+        # Determine the type of commit to get the appropriate icon
+        type_match = COMMIT_TYPE_REGEX.match(commit_msg)
+        if type_match:
+            commit_type = type_match.group("type")
+            logger.debug(f"Detected commit type: {commit_type}")
         else:
-            logger.debug("Commit message contains square brackets. No icon added.")
-            sys.exit(0)  # Valid commit message without needing an icon; proceed
+            commit_type = "chore"  # Default to 'chore' if no type is found
+            logger.debug("No commit type detected. Defaulting to 'chore'.")
+            sys.exit(1)
+
+        # Add the icon to the existing commit message
+        updated_commit_msg = add_icon_to_commit_message(commit_type, commit_msg)
+
+        # Write the updated commit message back to the file
+        amend_commit(updated_commit_msg)
+
+        # Inform the user and abort the commit to allow them to review the amended message
+        logger.info(
+            "Commit message has been updated with an icon. Please review and finalize the commit."
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
