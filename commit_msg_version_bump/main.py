@@ -120,6 +120,7 @@ def get_latest_commit_message() -> str:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
         ).stdout.strip()
         logger.debug(f"Latest commit message: {message}")
         return message
@@ -201,7 +202,11 @@ def bump_version(part: str) -> None:
         subprocess.CalledProcessError: If bump2version fails.
     """
     try:
-        subprocess.run(["bump2version", part], check=True)
+        subprocess.run(
+            ["bump2version", part],
+            check=True,
+            encoding="utf-8",
+        )
         logger.info(f"Successfully bumped the {part} version.")
     except subprocess.CalledProcessError as error:
         logger.error(f"Failed to bump the {part} version: {error}")
@@ -216,7 +221,11 @@ def stage_changes(pyproject_path: str = "pyproject.toml") -> None:
         pyproject_path (str): Path to the file to stage.
     """
     try:
-        subprocess.run(["git", "add", pyproject_path], check=True)
+        subprocess.run(
+            ["git", "add", pyproject_path],
+            check=True,
+            encoding="utf-8",
+        )
         logger.debug(f"Staged {pyproject_path} for commit.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to stage {pyproject_path}: {e}")
@@ -235,10 +244,14 @@ def amend_commit(new_commit_msg: str) -> None:
     """
     try:
         # Amend the commit with the new commit message
-        subprocess.run(["git", "commit", "--amend", "-m", new_commit_msg], check=True)
+        subprocess.run(
+            ["git", "commit", "--amend", "-m", new_commit_msg],
+            check=True,
+            encoding="utf-8",
+        )
         logger.info("Successfully amended the commit with the new version bump.")
         logger.info(
-            "Please perform a force push using 'git push' to update the remote repository. Avoid use --force"
+            "Please perform a push using 'git push' to update the remote repository. Avoid using --force"
         )
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to amend the commit: {e}")
@@ -283,7 +296,7 @@ def main() -> None:
         amend_commit(updated_commit_msg)
 
         logger.info(
-            "Aborting the current push. Please perform a force push using 'git push'. Avoid use --force"
+            "Aborting the current push. Please perform a push using 'git push'. Avoid using --force"
         )
         sys.exit(1)
     else:
@@ -310,11 +323,7 @@ def determine_version_bump(commit_msg: str) -> Optional[str]:
         elif "patch" in keyword:
             return "patch"
     else:
-        # Fallback based on commit type
-        type_match = COMMIT_TYPE_REGEX.match(commit_msg)
-        if type_match:
-            commit_type = type_match.group("type").lower()
-            return VERSION_BUMP_MAPPING.get(commit_type)
+        return None
     return None
 
 
