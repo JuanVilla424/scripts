@@ -171,21 +171,18 @@ def get_new_version(pyproject_path: str = "pyproject.toml") -> str:
         sys.exit(1)
 
 
-def add_icon_and_prepare_commit_message(
-    commit_type: str, current_version: str, new_version: str
-) -> str:
+def add_icon_and_prepare_commit_message(current_version: str, new_version: str) -> str:
     """
     Prepares the new commit message with the icon and version bump.
 
     Args:
-        commit_type (str): The type of the commit (e.g., 'chore', 'fix').
         current_version (str): The current version before bump.
         new_version (str): The new version after bump.
 
     Returns:
         str: The new commit message.
     """
-    icon = TYPE_MAPPING.get(commit_type.lower(), "")
+    icon = "🔖"
     new_commit_msg = f"{icon} Bump version: {current_version} → {new_version}"
     logger.debug(f"New commit message: {new_commit_msg}")
     return new_commit_msg
@@ -272,7 +269,6 @@ def main() -> None:
         commit_type = type_match.group("type")
         logger.debug(f"Detected commit type: {commit_type}")
     else:
-        commit_type = "chore"  # Default to 'chore' if no type is found
         logger.debug("No commit type detected. Defaulting to 'chore'.")
 
     version_bump_part = determine_version_bump(latest_commit_msg)
@@ -286,9 +282,7 @@ def main() -> None:
 
         new_version = get_new_version()
 
-        updated_commit_msg = add_icon_and_prepare_commit_message(
-            commit_type, current_version, new_version
-        )
+        updated_commit_msg = add_icon_and_prepare_commit_message(current_version, new_version)
 
         # Stage the updated pyproject.toml
         stage_changes()
@@ -313,6 +307,7 @@ def determine_version_bump(commit_msg: str) -> Optional[str]:
     Returns:
         Optional[str]: The version part to bump ('major', 'minor', 'patch') or None.
     """
+    logger.debug(f"Detected commit message: {commit_msg}")
     match = VERSION_KEYWORD_REGEX.search(commit_msg)
     if match:
         keyword = match.group("keyword").lower()
