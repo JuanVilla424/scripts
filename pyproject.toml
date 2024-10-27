@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scripts"
-version = "1.0.18"
+version = "1.0.19"
 description = "CICD Core Scripts"
 authors = ["B <g46327wsj1.marbling129@passinbox.com>"]
 license = "Apache 2.0"
