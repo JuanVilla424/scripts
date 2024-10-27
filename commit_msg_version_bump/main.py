@@ -128,12 +128,9 @@ def get_pushed_refs() -> List[str]:
         sys.exit(1)
 
 
-def get_upstream_branch(local_ref: str) -> Optional[str]:
+def get_upstream_branch() -> Optional[str]:
     """
-    Retrieves the upstream branch for a given local ref.
-
-    Args:
-        local_ref (str): The local ref being pushed.
+    Retrieves the upstream branch for the current branch.
 
     Returns:
         Optional[str]: The upstream branch name or None if not found.
@@ -146,10 +143,10 @@ def get_upstream_branch(local_ref: str) -> Optional[str]:
             stderr=subprocess.PIPE,
             text=True,
         ).stdout.strip()
-        logger.debug(f"Upstream branch for {local_ref}: {upstream}")
+        logger.debug(f"Upstream branch: {upstream}")
         return upstream
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error retrieving upstream branch for {local_ref}: {e.stderr}")
+        logger.error(f"Error retrieving upstream branch: {e.stderr}")
         return None
 
 
@@ -353,12 +350,12 @@ def main() -> None:
         logger.info("No refs being pushed.")
         return
 
-    for local_ref in pushed_refs:
-        upstream_ref = get_upstream_branch(local_ref)
-        if not upstream_ref:
-            logger.warning(f"No upstream branch found for {local_ref}. Skipping.")
-            continue
+    upstream_ref = get_upstream_branch()
+    if not upstream_ref:
+        logger.error("No upstream branch found. Aborting.")
+        sys.exit(1)
 
+    for local_ref in pushed_refs:
         commits = get_commits_being_pushed(local_ref, upstream_ref)
         if not commits:
             logger.info(f"No new commits to process for {local_ref}.")
