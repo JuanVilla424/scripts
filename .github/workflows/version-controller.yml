@@ -104,8 +104,9 @@ jobs:
           script: |
             const head = '${{ steps.determine_branch.outputs.current_branch }}';
             const base = '${{ steps.determine_branch.outputs.next_branch }}';
-            const title = `from ${{ steps.determine_branch.outputs.current_branch }} - ${{ steps.get_commit.outputs.commit_message }} into ${{ steps.determine_branch.outputs.next_branch }}`;
-            const body = `Automatically created pull request for release ${{ steps.create_tag.outputs.tag_name }} into ${base} branch.`;
+            const version = '${{ steps.create_tag.outputs.tag_name }}';
+            const title = `From ${head} → Bump version: ${version} into ${base}`;
+            const body = `Automatically created pull request for release ${version} into ${base} branch.`;
 
             const { data: existingPRs } = await github.rest.pulls.list({
               owner: context.repo.owner,
