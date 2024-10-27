@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scripts"
-version = "1.0.16"
+version = "1.0.17"
 description = "CICD Core Scripts"
 authors = ["B <g46327wsj1.marbling129@passinbox.com>"]
 license = "Apache 2.0"
@@ -71,5 +71,5 @@ ensure_newline_before_comments = true
 rcfile = ".pylintrc"
 
 [build-system]
-requires = ["poetry-core>=1.0.16"]
+requires = ["poetry-core>=1.0.17"]
 build-backend = "poetry.core.masonry.api"
