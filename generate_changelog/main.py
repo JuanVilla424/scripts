@@ -3,19 +3,24 @@
 generate_changelog.py
 
 This script automatically generates or updates the CHANGELOG.md file based on commit messages.
-It processes all commit history and categorizes commits into features, fixes, etc., while
-grouping non-conforming commits under a separate section.
+It processes commit history for each Git tag, categorizes commits into sections like Features,
+Bug Fixes, etc., and compiles them into a structured changelog.
 
 Usage:
     python generate_changelog.py
+    python generate_changelog.py --log-level DEBUG
 """
 
-import subprocess
+import argparse
+import logging
 import re
+import subprocess
 from datetime import datetime, timezone
-from typing import List, Dict, Tuple
-
-DEBUG = False
+from logging.handlers import RotatingFileHandler
+from typing import Dict, List, Tuple
+from collections import OrderedDict
+import os
+import sys
 
 # Define the path to the CHANGELOG.md
 CHANGELOG_PATH = "CHANGELOG.md"
@@ -24,8 +29,7 @@ CHANGELOG_PATH = "CHANGELOG.md"
 # Example: feat(authentication): add OAuth2 support [minor candidate]
 COMMIT_REGEX = re.compile(
     r"^(?P<type>feat|fix|docs|style|refactor|perf|test|chore)"
-    r"(?:\((?P<scope>[^)]+)\))?:\s+(?P<description>.+?)\s+\[(?P<versioning_keyword>minor candidate|major "
-    r"candidate|patch candidate)]$",
+    r"(?:\((?P<scope>[^)]+)\))?:\s+(?P<description>.+?)\s+\[(?P<versioning_keyword>minor candidate|major candidate|patch candidate)]$",
     re.IGNORECASE,
 )
 
@@ -41,50 +45,270 @@ TYPE_MAPPING = {
     "chore": "### Chores",
 }
 
+# Initialize the logger
+logger = logging.getLogger(__name__)
 
-def get_latest_version_from_changelog() -> str:
+
+def parse_arguments() -> argparse.Namespace:
     """
-    Retrieves the latest version from the CHANGELOG.md file.
+    Parses command-line arguments.
 
     Returns:
-        str: The latest version number or an empty string if not found.
+        argparse.Namespace: Parsed arguments.
     """
-    try:
-        with open(CHANGELOG_PATH, "r", encoding="utf-8") as f:
-            for line in f:
-                match = re.match(r"^## \[(\d+\.\d+\.\d+)]", line)
-                if match:
-                    return match.group(1)
-    except FileNotFoundError:
-        return ""
-    return ""
+    parser = argparse.ArgumentParser(
+        description="Automatically generate or update CHANGELOG.md based on commit messages."
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["INFO", "DEBUG"],
+        default="INFO",
+        help="Set the logging level. Default is INFO.",
+    )
+    return parser.parse_args()
 
 
-def get_commits_since_version(version: str) -> List[str]:
+def configure_logger(log_level: str) -> None:
     """
-    Retrieves commit messages since the specified version.
+    Configures logging for the script.
 
     Args:
-        version (str): The version number to retrieve commits since.
+        log_level (str): Logging level as a string (e.g., 'INFO', 'DEBUG').
+    """
+    numeric_level = getattr(logging, log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f"Invalid log level: {log_level}")
+
+    logger.setLevel(numeric_level)
+
+    # Set up log rotation: max size 5MB, keep 5 backup files
+    file_handler = RotatingFileHandler(
+        "changelog_sync.log", maxBytes=5 * 1024 * 1024, backupCount=5
+    )
+    console_handler = logging.StreamHandler()
+
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    logger.handlers.clear()
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+
+def fetch_tags() -> None:
+    """
+    Fetches all tags from the remote repository to ensure the latest tags are available locally.
+    """
+    try:
+        logger.debug("Fetching all Git tags from remote repository.")
+        subprocess.check_output(["git", "fetch", "--tags"])
+        logger.info("Successfully fetched Git tags.")
+    except subprocess.CalledProcessError as error:
+        logger.error(f"Error fetching Git tags: {error}")
+        raise
+
+
+def parse_version(version_str: str) -> Tuple[int, int, int]:
+    """
+    Parses a version string into its major, minor, and patch components.
+
+    Args:
+        version_str (str): The version string (e.g., 'v1.0.8-test' or 'v1.0.8').
+
+    Returns:
+        Tuple[int, int, int]: A tuple containing major, minor, and patch numbers.
+    """
+    try:
+        # Remove the 'v' prefix if present
+        if version_str.startswith("v"):
+            version_str = version_str[1:]
+        # Remove any suffix after '-', e.g., '1.0.8-test' -> '1.0.8'
+        version_str = version_str.split("-")[0]
+        # Split into major, minor, patch and convert to integers
+        major, minor, patch = map(int, version_str.split("."))
+        return major, minor, patch
+    except (ValueError, IndexError):
+        logger.error(f"Invalid version format: {version_str}")
+        return 0, 0, 0
+
+
+def compare_versions(v1: str, v2: str) -> int:
+    """
+    Compares two version strings.
+
+    Args:
+        v1 (str): First version string.
+        v2 (str): Second version string.
+
+    Returns:
+        int: 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
+    """
+    v1_major, v1_minor, v1_patch = parse_version(v1)
+    v2_major, v2_minor, v2_patch = parse_version(v2)
+
+    if v1_major > v2_major:
+        return 1
+    if v1_major < v2_major:
+        return -1
+
+    if v1_minor > v2_minor:
+        return 1
+    if v1_minor < v2_minor:
+        return -1
+
+    if v1_patch > v2_patch:
+        return 1
+    if v1_patch < v2_patch:
+        return -1
+
+    return 0
+
+
+def get_sorted_tags() -> List[str]:
+    """
+    Retrieves all semantic Git tags and sorts them in ascending order.
+
+    Returns:
+        List[str]: A list of sorted semantic Git tags.
+    """
+    version_pattern = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+    try:
+        logger.debug("Retrieving all Git tags.")
+        tags = subprocess.check_output(["git", "tag", "--list"], encoding="utf-8").split("\n")
+        tags = [tag.strip() for tag in tags if tag.strip()]
+        semantic_tags = [tag for tag in tags if version_pattern.match(tag)]
+        if not semantic_tags:
+            logger.warning("No semantic Git tags found. Starting from scratch.")
+            return []
+
+        # Sort tags using semantic versioning in ascending order
+        sorted_tags = sorted(
+            semantic_tags, key=lambda s: parse_version(s), reverse=False  # Ascending order
+        )
+        logger.debug(f"Sorted semantic tags: {sorted_tags}")
+        return sorted_tags
+    except subprocess.CalledProcessError as error:
+        logger.error(f"Error retrieving Git tags: {error}")
+        return []
+
+
+def get_commits_between_tags(old_tag: str, new_tag: str) -> List[str]:
+    """
+    Retrieves commit messages between two Git tags.
+
+    Args:
+        old_tag (str): The older Git tag.
+        new_tag (str): The newer Git tag.
 
     Returns:
         List[str]: A list of commit messages.
     """
     try:
-        if version:
-            commits = (
-                subprocess.check_output(["git", "log", f"v{version}..HEAD", "--pretty=format:%s"])
-                .decode()
-                .split("\n")
-            )
+        if old_tag:
+            commit_range = f"{old_tag}..{new_tag}"
         else:
-            # If no version found in CHANGELOG, get all commits
+            # If old_tag is empty, get all commits up to new_tag
+            commit_range = new_tag
+        logger.debug(f"Retrieving commits between {old_tag} and {new_tag}.")
+        commits = (
+            subprocess.check_output(["git", "log", commit_range, "--pretty=format:%s"])
+            .decode()
+            .split("\n")
+        )
+        if not old_tag:
+            old_tag = "repo_init"
+        commits = [commit.strip() for commit in commits if commit.strip()]
+        logger.info(f"Number of commits between {old_tag} and {new_tag}: {len(commits)}")
+        return commits
+    except subprocess.CalledProcessError as error:
+        logger.error(f"Error retrieving commits between {old_tag} and {new_tag}: {error}")
+        return []
+
+
+def get_commits_since_last_tag(tags: List[str]) -> List[str]:
+    """
+    Retrieves commit messages since the last Git tag.
+
+    Args:
+        tags (List[str]): A list of sorted Git tags.
+
+    Returns:
+        List[str]: A list of commit messages.
+    """
+    if not tags:
+        # If no tags exist, retrieve all commits
+        try:
+            logger.debug("No tags found. Retrieving all commits.")
             commits = (
                 subprocess.check_output(["git", "log", "--pretty=format:%s"]).decode().split("\n")
             )
-        return commits
-    except subprocess.CalledProcessError:
-        return []
+            commits = [commit.strip() for commit in commits if commit.strip()]
+            logger.info(f"Number of commits retrieved: {len(commits)}")
+            return commits
+        except subprocess.CalledProcessError as error:
+            logger.error(f"Error retrieving all commits: {error}")
+            return []
+    else:
+        # Retrieve commits since the latest tag
+        latest_tag = tags[-1]  # Sorted condescendingly, latest is last
+        try:
+            logger.debug(f"Retrieving commits since the latest tag: {latest_tag}")
+            commits = (
+                subprocess.check_output(["git", "log", f"{latest_tag}..HEAD", "--pretty=format:%s"])
+                .decode()
+                .split("\n")
+            )
+            commits = [commit.strip() for commit in commits if commit.strip()]
+            logger.info(f"Number of commits since {latest_tag}: {len(commits)}")
+            return commits
+        except subprocess.CalledProcessError as error:
+            logger.error(f"Error retrieving commits since {latest_tag}: {error}")
+            return []
+
+
+def get_all_commits(tags: List[str]) -> Dict[str, List[str]]:
+    """
+    Retrieves all commits for each tag and organizes them in an OrderedDict.
+
+    Args:
+        tags (List[str]): A list of sorted Git tags (ascending order).
+
+    Returns:
+        Dict[str, List[str]]: An OrderedDict where keys are tags and values are lists of commit messages.
+    """
+    commits_dict = OrderedDict()
+
+    # Handle commits after the latest tag (Unreleased)
+    if tags:
+        latest_tag = tags[-1]  # Last tag is the latest
+        try:
+            commit_range = f"{latest_tag}..HEAD"
+            logger.debug(f"Retrieving commits after the latest tag: {latest_tag}")
+            unreleased_commits = (
+                subprocess.check_output(["git", "log", commit_range, "--pretty=format:%s"])
+                .decode()
+                .split("\n")
+            )
+            unreleased_commits = [commit.strip() for commit in unreleased_commits if commit.strip()]
+            if unreleased_commits:
+                commits_dict["Unreleased"] = unreleased_commits
+                logger.info(f"Number of unreleased commits: {len(unreleased_commits)}")
+        except subprocess.CalledProcessError as error:
+            logger.error(f"Error retrieving unreleased commits: {error}")
+
+    # Process sorted_tags in ascending order
+    previous_tag = None
+    for tag in tags:
+        commits = (
+            get_commits_between_tags(previous_tag, tag)
+            if previous_tag
+            else get_commits_between_tags("", tag)
+        )
+        commits_dict[tag.lstrip("v")] = commits
+        previous_tag = tag
+
+    return commits_dict
 
 
 def parse_commits(commits: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
@@ -97,8 +321,8 @@ def parse_commits(commits: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
     Returns:
         Tuple[Dict[str, List[str]], List[str]]: A dictionary categorizing commits and a list of non-conforming commits.
     """
-    changelog = {section: [] for section in TYPE_MAPPING.values()}
-    non_conforming_commits = []
+    changelog: Dict[str, List[str]] = {section: [] for section in TYPE_MAPPING.values()}
+    non_conforming_commits: List[str] = []
 
     for commit in commits:
         match = COMMIT_REGEX.match(commit)
@@ -115,13 +339,18 @@ def parse_commits(commits: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
                 else:
                     entry = f"- {description} (`{versioning_keyword}`)"
                 changelog[section].append(entry)
+                logger.debug(f"Commit categorized under {section}: {entry}")
             else:
                 non_conforming_commits.append(commit)
+                logger.debug(f"Commit type '{commit_type}' not recognized.")
         else:
             non_conforming_commits.append(commit)
+            logger.debug(f"Commit does not match pattern: {commit}")
 
     # Remove empty sections
     changelog = {k: v for k, v in changelog.items() if v}
+    logger.debug(f"Changelog categories: {list(changelog.keys())}")
+    logger.debug(f"Non-conforming commits count: {len(non_conforming_commits)}")
     return changelog, non_conforming_commits
 
 
@@ -141,6 +370,8 @@ def generate_changelog_entry(
     """
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     entry = f"## [{version}] - {date}\n\n"
+    logger.debug(f"Generating changelog entry for version {version}.")
+
     for section, items in changelog.items():
         entry += f"{section}\n"
         for item in items:
@@ -153,124 +384,99 @@ def generate_changelog_entry(
             entry += f"- {commit}\n"
         entry += "\n"
 
+    logger.debug("Changelog entry generated.")
     return entry
 
 
-def update_changelog(version: str, new_entry: str):
+def generate_full_changelog(commits_dict: Dict[str, List[str]]) -> str:
     """
-    Updates the CHANGELOG.md file by prepending the new entry.
+    Generates the full changelog content from the commits' dictionary.
 
     Args:
-        version (str): The version number.
-        new_entry (str): The new changelog entry to add.
+        commits_dict (Dict[str, List[str]]): An OrderedDict with version keys and commit lists.
+
+    Returns:
+        str: The full formatted changelog content.
     """
-    if DEBUG:
-        print(f"Updating version... {version}")
+    changelog_content = ""
+
+    # Iterate over commits_dict in reverse to have the latest versions first
+    for version, commits in reversed(list(commits_dict.items())):
+        if not commits:
+            continue
+        changelog, non_conforming = parse_commits(commits)
+        changelog_entry = generate_changelog_entry(version, changelog, non_conforming)
+        changelog_content += changelog_entry
+
+    return changelog_content
+
+
+def update_changelog(new_content: str) -> bool:
+    """
+    Creates or updates the CHANGELOG.md file by prepending the new content.
+
+    Args:
+        new_content (str): The new changelog content to add.
+
+    Returns:
+        bool: True if the changelog was updated, False if no changes were necessary.
+    """
+    logger.info(f"Checking if {CHANGELOG_PATH} needs to be updated.")
     try:
-        with open(CHANGELOG_PATH, "r", encoding="utf-8") as f:
-            existing_content = f.read()
-    except FileNotFoundError:
-        existing_content = ""
+        if os.path.exists(CHANGELOG_PATH):
+            with open(CHANGELOG_PATH, "r", encoding="utf-8") as file:
+                existing_content = file.read()
 
-    with open(CHANGELOG_PATH, "w", encoding="utf-8") as f:
-        f.write(new_entry + "\n" + existing_content)
+        else:
+            existing_content = ""
+            logger.warning(f"{CHANGELOG_PATH} not found. A new changelog will be created.")
+    except Exception as error:
+        logger.error(f"Error reading {CHANGELOG_PATH}: {error}")
+        return False
 
+    # Compare the new content with the existing content
+    if new_content.strip() == existing_content.strip():
+        logger.info("No changes detected in the changelog. No update needed.")
+        return False
 
-def get_next_version(latest_version: str, version_bump: str) -> str:
-    """
-    Calculates the next version based on the current version and the type of version bump.
-
-    Args:
-        latest_version (str): The latest version number.
-        version_bump (str): The type of version bump ('major', 'minor', 'patch').
-
-    Returns:
-        str: The next version string.
-    """
-    if not latest_version:
-        # Default initial version if no changelog exists
-        return "1.0.0"
-
-    major, minor, patch = map(int, latest_version.split("."))
-
-    if version_bump == "major":
-        major += 1
-        minor = 0
-        patch = 0
-    elif version_bump == "minor":
-        minor += 1
-        patch = 0
-    elif version_bump == "patch":
-        patch += 1
-
-    return f"{major}.{minor}.{patch}"
+    # Update the changelog
+    try:
+        with open(CHANGELOG_PATH, "w", encoding="utf-8") as file:
+            file.write(new_content + "\n" + existing_content)
+        logger.info(f"{CHANGELOG_PATH} has been updated.")
+        return True
+    except Exception as error:
+        logger.error(f"Error updating {CHANGELOG_PATH}: {error}")
+        return False
 
 
-def get_version_bump(commits: List[str]) -> str:
-    """
-    Determines the type of version bump based on commit messages.
-
-    Args:
-        commits (List[str]): A list of commit messages.
-
-    Returns:
-        str: The type of version bump ('major', 'minor', 'patch') or an empty string if none.
-    """
-    # Priority: major > minor > patch
-    bump = ""
-
-    for commit in commits:
-        match = COMMIT_REGEX.match(commit)
-        if match:
-            keyword = match.group("versioning_keyword").lower()
-            if keyword == "major candidate":
-                bump = "major"
-            elif keyword == "minor candidate" and bump != "major":
-                bump = "minor"
-            elif keyword == "patch candidate" and not bump:
-                bump = "patch"
-
-    return bump
-
-
-def main():
+def main() -> None:
     """
     Main function to generate or update the CHANGELOG.md.
     """
-    latest_version = get_latest_version_from_changelog()
-    print(f"Latest version in CHANGELOG.md: {latest_version}")
-    commits = get_commits_since_version(latest_version)
-    if not commits:
-        print("No new commits to include in the changelog.")
+    fetch_tags()
+    sorted_tags = get_sorted_tags()
+    commits_dict = get_all_commits(sorted_tags)
+    changelog_content = generate_full_changelog(commits_dict)
+
+    if not changelog_content:
+        logger.info("No commits found to include in the changelog.")
         return
 
-    changelog, non_conforming = parse_commits(commits)
-    if not changelog and not non_conforming:
-        print("No valid commits found for changelog generation.")
+    # TODO: Solve error comparing, for now running manual
+    if os.path.exists(CHANGELOG_PATH):
         return
-
-    # Determine the next version based on the highest priority keyword
-    version_bump = get_version_bump(commits)
-
-    if not version_bump and non_conforming:
-        # Assign a patch bump if there are non-conforming commits but no version bump keywords
-        version_bump = "patch"
-
-    if not version_bump and not non_conforming:
-        print("No versioning keyword found in commits.")
-        return
-
-    # Get the next version
-    next_version = get_next_version(latest_version, version_bump)
-    print(f"Bumping version: {version_bump} to {next_version}")
-
-    # Generate changelog entry
-    changelog_entry = generate_changelog_entry(next_version, changelog, non_conforming)
-
-    # Update CHANGELOG.md
-    update_changelog(next_version, changelog_entry)
-    print(f"CHANGELOG.md updated with version {next_version}.")
+    # Check and update the changelog only if necessary
+    updated = update_changelog(changelog_content)
+    if not updated:
+        logger.info("Changelog was not updated as there are no new changes.")
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_arguments()
+    configure_logger(args.log_level)
+    try:
+        main()
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
+        sys.exit(1)
