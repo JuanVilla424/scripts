@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-commit_msg_icon_adder.py
+control_commit/main.py
 
 A script to validate commit messages and add appropriate icons based on commit types.
 Ensures that commit messages follow a specific structure and naming conventions.
 Adds icons to commit messages that do not contain square brackets [].
-
-Usage:
-    commit_msg_icon_adder.py [--log-level {INFO,DEBUG}] <commit_msg_file>
 """
 
 import argparse
@@ -77,17 +74,34 @@ def configure_logger(log_level: str) -> None:
 
     # Set up log rotation: max size 5MB, keep 5 backup files
     file_handler = RotatingFileHandler(
-        "commit_msg_icon_adder.log", maxBytes=5 * 1024 * 1024, backupCount=5
+        "commit_msg_icon_adder.log",
+        maxBytes=5 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",  # Ensure UTF-8 encoding to handle emojis
     )
-    console_handler = logging.StreamHandler()
-
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
+
+    # Create a safe console handler that replaces unencodable characters
+    class SafeStreamHandler(logging.StreamHandler):
+        def emit(self, record):
+            try:
+                msg = self.format(record)
+                # Replace characters that can't be encoded
+                msg = msg.encode(self.stream.encoding, errors="replace").decode(
+                    self.stream.encoding
+                )
+                self.stream.write(msg + self.terminator)
+                self.flush()
+            except Exception:
+                self.handleError(record)
+
+    safe_console_handler = SafeStreamHandler()
+    safe_console_handler.setFormatter(formatter)
 
     logger.handlers.clear()
     logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    logger.addHandler(safe_console_handler)
 
 
 def read_commit_message(file_path: str) -> str:
@@ -148,11 +162,11 @@ def add_icon_to_commit_message(commit_type: str, existing_commit_msg: str) -> st
         str: The commit message with the icon prepended.
     """
     icon = TYPE_MAPPING.get(commit_type.lower(), "")
-    if not existing_commit_msg.startswith(icon):
+    if icon and not existing_commit_msg.startswith(icon):
         new_commit_msg = f"{icon} {existing_commit_msg}"
         logger.debug(f"Updated commit message with icon: {new_commit_msg}")
         return new_commit_msg
-    logger.debug("Icon already present in commit message.")
+    logger.debug("Icon already present in commit message or no icon defined for commit type.")
     return existing_commit_msg
 
 
@@ -173,51 +187,6 @@ def write_commit_message(file_path: str, commit_msg: str) -> None:
         sys.exit(1)
 
 
-def main() -> None:
-    """
-    Main function to validate commit messages and add icons if necessary.
-    Exits with code 1 if validation fails.
-    """
-    args = parse_arguments()
-    configure_logger(args.log_level)
-
-    commit_msg_file = ".git/COMMIT_EDITMSG"
-    commit_msg = read_commit_message(commit_msg_file)
-
-    # Validate the commit message structure and naming
-    if not validate_commit_message(commit_msg):
-        logger.error("Commit message validation failed. Aborting commit.")
-        sys.exit(1)
-
-    # Check if the commit message contains square brackets
-    if not has_square_brackets(commit_msg):
-        logger.debug("Commit message does not contain square brackets. Proceeding to add icon.")
-
-        # Determine the type of commit to get the appropriate icon
-        type_match = COMMIT_TYPE_REGEX.match(commit_msg)
-        if type_match:
-            commit_type = type_match.group("type")
-            logger.debug(f"Detected commit type: {commit_type}")
-        else:
-            commit_type = "chore"  # Default to 'chore' if no type is found
-            logger.debug("No commit type detected. Defaulting to 'chore'.")
-            exit(1)
-
-        # Add the icon to the existing commit message
-        updated_commit_msg = add_icon_to_commit_message(commit_type, commit_msg)
-
-        # Write the updated commit message back to the file
-        write_commit_message(commit_msg_file, updated_commit_msg)
-
-        # Inform the user and abort the commit to allow them to review the amended message
-        logger.info(
-            "Commit message has been updated with an icon. Please review the commit message."
-        )
-        sys.exit(1)
-    else:
-        logger.debug("Commit message contains square brackets. No icon added.")
-
-
 def has_square_brackets(commit_msg: str) -> bool:
     """
     Checks if the commit message contains square brackets.
@@ -228,7 +197,71 @@ def has_square_brackets(commit_msg: str) -> bool:
     Returns:
         bool: True if square brackets are present, False otherwise.
     """
-    return bool(re.search(r"\[.*?]", commit_msg))
+    return bool(re.search(r"\[.*?\]", commit_msg))
+
+
+def main() -> None:
+    """
+    Main function to validate commit messages and add icons if necessary.
+    Exits with code 1 if validation fails or after adding an icon.
+    """
+    args = parse_arguments()
+    configure_logger(args.log_level)
+
+    commit_msg_file = ".git/COMMIT_EDITMSG"
+    commit_msg = read_commit_message(commit_msg_file)
+
+    # Verify if the commit message already starts with an icon
+    icon_present = False
+    for icon in TYPE_MAPPING.values():
+        if commit_msg.startswith(f"{icon} "):
+            icon_present = True
+            commit_msg_without_icon = commit_msg[len(icon) + 1 :]
+            logger.debug(f"Commit message already has icon '{icon}'.")
+            break
+
+    if icon_present:
+        # Validate the commit message without the icon
+        if not validate_commit_message(commit_msg_without_icon):
+            logger.error("Commit message validation failed after removing icon. Aborting commit.")
+            sys.exit(1)
+        else:
+            logger.debug("Commit message with icon is valid.")
+            sys.exit(0)  # Valid commit message with icon; proceed
+    else:
+        # Validate the original commit message
+        if not validate_commit_message(commit_msg):
+            logger.error("Commit message validation failed. Aborting commit.")
+            sys.exit(1)
+
+        # Check if the commit message contains square brackets
+        if not has_square_brackets(commit_msg):
+            logger.debug("Commit message does not contain square brackets. Proceeding to add icon.")
+
+            # Determine the type of commit to get the appropriate icon
+            type_match = COMMIT_TYPE_REGEX.match(commit_msg)
+            if type_match:
+                commit_type = type_match.group("type")
+                logger.debug(f"Detected commit type: {commit_type}")
+            else:
+                commit_type = "chore"  # Default to 'chore' if no type is found
+                logger.debug("No commit type detected. Defaulting to 'chore'.")
+                sys.exit(1)
+
+            # Add the icon to the existing commit message
+            updated_commit_msg = add_icon_to_commit_message(commit_type, commit_msg)
+
+            # Write the updated commit message back to the file
+            write_commit_message(commit_msg_file, updated_commit_msg)
+
+            # Inform the user and abort the commit to allow them to review the amended message
+            logger.info(
+                "Commit message has been updated with an icon. Please review and finalize the commit."
+            )
+            sys.exit(1)
+        else:
+            logger.debug("Commit message contains square brackets. No icon added.")
+            sys.exit(0)  # Valid commit message without needing an icon; proceed
 
 
 if __name__ == "__main__":

@@ -310,11 +310,7 @@ def determine_version_bump(commit_msg: str) -> Optional[str]:
         elif "patch" in keyword:
             return "patch"
     else:
-        # Fallback based on commit type
-        type_match = COMMIT_TYPE_REGEX.match(commit_msg)
-        if type_match:
-            commit_type = type_match.group("type").lower()
-            return VERSION_BUMP_MAPPING.get(commit_type)
+        return None
     return None
 
 
