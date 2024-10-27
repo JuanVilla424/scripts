@@ -7,17 +7,16 @@ Handles major, minor, and patch releases. Additionally, it adds icons to commit 
 depending on their type and ensures that changes are committed in a single step.
 
 Usage:
-    commit_msg_version_bump.py <commit_msg_file> [--log-level {INFO,DEBUG}]
+    commit_msg_version_bump.py [--log-level {INFO,DEBUG}]
 """
 
 import argparse
 import logging
-import os
 import re
-from logging.handlers import RotatingFileHandler
 import subprocess
 import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+from typing import List, Optional
 
 import toml
 
@@ -71,11 +70,6 @@ def parse_arguments() -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "commit_msg_file",
-        type=str,
-        help="Path to the commit message file.",
-    )
-    parser.add_argument(
         "--log-level",
         choices=["INFO", "DEBUG"],
         default="INFO",
@@ -98,8 +92,8 @@ def configure_logger(log_level: str) -> None:
     logger.setLevel(numeric_level)
 
     # Set up log rotation: max size 5MB, keep 5 backup files
-    file_handler = logging.handlers.RotatingFileHandler(
-        "commit_msg_version_bump.log", maxBytes=5 * 1024 * 1024, backupCount=5
+    file_handler = RotatingFileHandler(
+        "changelog_sync.log", maxBytes=5 * 1024 * 1024, backupCount=5
     )
     console_handler = logging.StreamHandler()
 
@@ -107,35 +101,62 @@ def configure_logger(log_level: str) -> None:
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 
-    # Clear existing handlers
-    if logger.hasHandlers():
-        logger.handlers.clear()
-
+    logger.handlers.clear()
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
 
-def read_commit_message(commit_msg_file: str) -> str:
+def get_pushed_commits() -> List[str]:
     """
-    Reads the commit message from the given file.
-
-    Args:
-        commit_msg_file (str): Path to the commit message file.
+    Retrieves the list of commits being pushed.
 
     Returns:
-        str: The commit message content.
+        List[str]: List of commit hashes.
     """
     try:
-        with open(commit_msg_file, "r", encoding="utf-8") as file:
-            commit_msg = file.read().strip()
-            logger.debug(f"Original commit message: {commit_msg}")
-            return commit_msg
-    except FileNotFoundError:
-        logger.error(f"Commit message file not found: {commit_msg_file}")
+        # Fetch the commits being pushed by comparing the local and remote branches
+        process = subprocess.run(
+            ["git", "rev-list", "--no-merges", "origin/master..HEAD"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        commits = process.stdout.strip().split("\n")
+        logging.debug(f"Commits being pushed: {commits}")
+        return commits if commits != [""] else []
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error retrieving pushed commits: {e.stderr}")
         sys.exit(1)
-    except Exception as e:
-        logger.error(f"Error reading commit message file: {e}")
-        sys.exit(1)
+
+
+def read_commit_messages(commits: List[str]) -> List[str]:
+    """
+    Reads commit messages for the given list of commits.
+
+    Args:
+        commits (List[str]): List of commit hashes.
+
+    Returns:
+        List[str]: List of commit messages.
+    """
+    commit_messages = []
+    for commit in commits:
+        try:
+            process = subprocess.run(
+                ["git", "log", "--format=%B", "-n", "1", commit],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            message = process.stdout.strip()
+            logging.debug(f"Commit {commit}: {message}")
+            commit_messages.append(message)
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error reading commit {commit}: {e.stderr}")
+            sys.exit(1)
+    return commit_messages
 
 
 def add_icon_to_commit_message(commit_msg: str) -> str:
@@ -156,9 +177,9 @@ def add_icon_to_commit_message(commit_msg: str) -> str:
             # Avoid adding multiple icons
             if not commit_msg.startswith(icon):
                 new_commit_msg = f"{icon} {commit_msg}"
-                logger.debug(f"Updated commit message with icon: {new_commit_msg}")
+                logging.debug(f"Updated commit message with icon: {new_commit_msg}")
                 return new_commit_msg
-    logger.debug("No matching commit type found or icon already present.")
+    logging.debug("No matching commit type found or icon already present.")
     return commit_msg
 
 
@@ -202,9 +223,9 @@ def bump_version(part: str) -> None:
     """
     try:
         subprocess.run(["bump2version", part], check=True)
-        logger.info(f"Successfully bumped the {part} version.")
+        logging.info(f"Successfully bumped the {part} version.")
     except subprocess.CalledProcessError as error:
-        logger.error(f"Failed to bump the {part} version: {error}")
+        logging.error(f"Failed to bump the {part} version: {error}")
         sys.exit(1)
 
 
@@ -225,10 +246,10 @@ def get_new_version(pyproject_path: str = "pyproject.toml") -> str:
         with open(pyproject_path, "r", encoding="utf-8") as file:
             data = toml.load(file)
         version = data["tool"]["poetry"]["version"]
-        logger.debug(f"New version retrieved: {version}")
+        logging.debug(f"New version retrieved: {version}")
         return version
     except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError) as e:
-        logger.error(f"Error retrieving the version from {pyproject_path}: {e}")
+        logging.error(f"Error retrieving the version from {pyproject_path}: {e}")
         sys.exit(1)
 
 
@@ -241,9 +262,9 @@ def stage_changes(pyproject_path: str = "pyproject.toml") -> None:
     """
     try:
         subprocess.run(["git", "add", pyproject_path], check=True)
-        logger.debug(f"Staged {pyproject_path} for commit.")
+        logging.debug(f"Staged {pyproject_path} for commit.")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to stage {pyproject_path}: {e}")
+        logging.error(f"Failed to stage {pyproject_path}: {e}")
         sys.exit(1)
 
 
@@ -260,41 +281,48 @@ def amend_commit(new_commit_msg: str) -> None:
     try:
         # Amend the commit with the new commit message
         subprocess.run(["git", "commit", "--amend", "-m", new_commit_msg], check=True)
-        logger.info("Successfully amended the commit with the new version bump.")
+        logging.info("Successfully amended the commit with the new version bump.")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to amend the commit: {e}")
+        logging.error(f"Failed to amend the commit: {e}")
         sys.exit(1)
 
 
 def main() -> None:
     """
-    Main function to parse the commit message and perform version bumping and commit message enhancement.
+    Main function to parse commit messages and perform version bumping and commit message enhancement.
     """
     args = parse_arguments()
     configure_logger(args.log_level)
 
-    # Pre-commit sets the commit message file as the first argument for commit-msg hooks
-    if len(sys.argv) < 2:
-        logger.error("Commit message file path not provided.")
-        sys.exit(1)
+    # Retrieve commits being pushed
+    pushed_commits = get_pushed_commits()
+    if not pushed_commits:
+        logging.info("No new commits to process.")
+        return
 
-    commit_msg_file = sys.argv[1]
-    commit_msg = read_commit_message(commit_msg_file)
-    updated_commit_msg = add_icon_to_commit_message(commit_msg)
-    version_bump_part = determine_version_bump(commit_msg)
+    # Read commit messages
+    commit_messages = read_commit_messages(pushed_commits)
 
-    if version_bump_part:
-        logger.info(f"Version bump detected: {version_bump_part}")
-        bump_version(version_bump_part)
-        new_version = get_new_version()
+    # Process each commit message
+    for commit_msg in commit_messages:
+        updated_commit_msg = add_icon_to_commit_message(commit_msg)
+        version_bump_part = determine_version_bump(commit_msg)
 
-        # Stage the updated pyproject.toml
-        stage_changes()
+        if version_bump_part:
+            logging.info(f"Version bump detected: {version_bump_part}")
+            bump_version(version_bump_part)
+            # new_version = get_new_version()
 
-        # Amend the commit with the updated commit message
-        amend_commit(updated_commit_msg)
-    else:
-        logger.info("No version bump detected in commit message.")
+            # Stage the updated pyproject.toml
+            stage_changes()
+
+            # Amend the latest commit with the updated commit message
+            amend_commit(updated_commit_msg)
+
+            # Since we've amended the commit, only one commit needs to be processed
+            break
+        else:
+            logging.info("No version bump detected in commit message.")
 
 
 if __name__ == "__main__":
