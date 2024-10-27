@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 from logging.handlers import RotatingFileHandler
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import toml
 
@@ -106,25 +106,25 @@ def configure_logger(log_level: str) -> None:
     logger.addHandler(console_handler)
 
 
-def get_pushed_refs() -> List[str]:
+def get_pushed_refs() -> List[Tuple[str, str]]:
     """
     Retrieves the list of refs being pushed.
 
     Returns:
-        List[str]: List of refs being pushed.
+        List[Tuple[str, str]]: List of tuples containing local_ref and remote_sha.
     """
     refs = []
     try:
         # Read from stdin the refs being pushed
         for line in sys.stdin:
             parts = line.strip().split()
-            if len(parts) >= 2:
-                local_ref, local_sha = parts[0], parts[1]
-                refs.append(local_ref)
-        logging.debug(f"Refs being pushed: {refs}")
+            if len(parts) >= 4:
+                local_ref, local_sha, remote_ref, remote_sha = parts[:4]
+                refs.append((local_ref, remote_sha))
+        logger.debug(f"Refs being pushed: {refs}")
         return refs
     except Exception as e:
-        logging.error(f"Error reading refs from stdin: {e}")
+        logger.error(f"Error reading refs from stdin: {e}")
         sys.exit(1)
 
 
@@ -150,13 +150,13 @@ def get_upstream_branch() -> Optional[str]:
         return None
 
 
-def get_commits_being_pushed(local_ref: str, remote_ref: str) -> List[str]:
+def get_commits_being_pushed(remote_sha: str, local_sha: str) -> List[str]:
     """
-    Retrieves the list of commit hashes being pushed for a given ref.
+    Retrieves the list of commit hashes being pushed for a given ref range.
 
     Args:
-        local_ref (str): The local ref being pushed.
-        remote_ref (str): The remote ref being pushed to.
+        remote_sha (str): The remote SHA before the push.
+        local_sha (str): The local SHA being pushed.
 
     Returns:
         List[str]: List of commit hashes being pushed.
@@ -164,7 +164,7 @@ def get_commits_being_pushed(local_ref: str, remote_ref: str) -> List[str]:
     try:
         commits = (
             subprocess.run(
-                ["git", "rev-list", "--no-merges", f"{remote_ref}..{local_ref}"],
+                ["git", "rev-list", "--no-merges", f"{remote_sha}..{local_sha}"],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -174,10 +174,10 @@ def get_commits_being_pushed(local_ref: str, remote_ref: str) -> List[str]:
             .split("\n")
         )
         commits = [commit for commit in commits if commit]
-        logger.debug(f"Commits being pushed for {local_ref}..{remote_ref}: {commits}")
+        logger.debug(f"Commits being pushed for {remote_sha}..{local_sha}: {commits}")
         return commits
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error retrieving commits for {local_ref}..{remote_ref}: {e.stderr}")
+        logger.error(f"Error retrieving commits for {remote_sha}..{local_sha}: {e.stderr}")
         sys.exit(1)
 
 
@@ -350,13 +350,21 @@ def main() -> None:
         logger.info("No refs being pushed.")
         return
 
-    upstream_ref = get_upstream_branch()
-    if not upstream_ref:
-        logger.error("No upstream branch found. Aborting.")
-        sys.exit(1)
+    for local_ref, remote_sha in pushed_refs:
+        try:
+            local_sha = subprocess.run(
+                ["git", "rev-parse", local_ref],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            ).stdout.strip()
+            logger.debug(f"Local SHA for {local_ref}: {local_sha}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error retrieving local SHA for {local_ref}: {e.stderr}")
+            continue
 
-    for local_ref in pushed_refs:
-        commits = get_commits_being_pushed(local_ref, upstream_ref)
+        commits = get_commits_being_pushed(remote_sha, local_sha)
         if not commits:
             logger.info(f"No new commits to process for {local_ref}.")
             continue
