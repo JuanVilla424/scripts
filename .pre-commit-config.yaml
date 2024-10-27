@@ -66,10 +66,11 @@ repos:
         files: ^docker-compose(\.dev|\.prod)?\.yml$
       - id: commit-msg-version-check
         name: commit-msg-version-check
-        entry: python commit_msg_version_bump/main.py
+        entry: python commit_msg_version_bump/main.py --log-level=DEBUG
         always_run: true
         language: system
-        args: [.git/COMMIT_EDITMSG]
+        pass_filenames: false
+        # args: [--commit_msg_file, .git/COMMIT_EDITMSG]
         stages: [pre-push]
       - id: bump-year
         name: bump-year
