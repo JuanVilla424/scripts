@@ -205,6 +205,7 @@ def main() -> None:
     Main function to validate commit messages and add icons if necessary.
     Exits with code 1 if validation fails or after adding an icon.
     """
+    global commit_msg_without_icon
     args = parse_arguments()
     configure_logger(args.log_level)
 
