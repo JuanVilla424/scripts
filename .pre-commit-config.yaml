@@ -69,6 +69,7 @@ repos:
         entry: python commit_msg_version_bump/main.py --log-level=DEBUG
         always_run: true
         language: system
+        args: [--commit_msg_file, .git/COMMIT_EDITMSG]
         stages: [pre-push]
       - id: bump-year
         name: bump-year
