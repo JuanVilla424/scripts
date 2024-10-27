@@ -10,6 +10,7 @@ Adds icons to commit messages that do not contain square brackets [].
 import argparse
 import logging
 import re
+import subprocess
 import sys
 from logging.handlers import RotatingFileHandler
 
@@ -170,20 +171,25 @@ def add_icon_to_commit_message(commit_type: str, existing_commit_msg: str) -> st
     return existing_commit_msg
 
 
-def write_commit_message(file_path: str, commit_msg: str) -> None:
+def amend_commit(new_commit_msg: str) -> None:
     """
-    Writes the updated commit message back to the commit message file.
+    Amends the current commit with the new commit message.
 
     Args:
-        file_path (str): Path to the commit message file.
-        commit_msg (str): The updated commit message.
+        new_commit_msg (str): The new commit message.
+
+    Raises:
+        subprocess.CalledProcessError: If git amend fails.
     """
     try:
-        with open(file_path, "w", encoding="utf-8") as file:
-            file.write(commit_msg + "\n")
-        logger.debug(f"Commit message written to file: {file_path}")
-    except Exception as e:
-        logger.error(f"Error writing to commit message file: {e}")
+        # Amend the commit with the new commit message
+        subprocess.run(["git", "commit", "--amend", "-m", new_commit_msg], check=True)
+        logger.info("Successfully amended the commit with the new commit message.")
+        logger.info(
+            "Please perform a push using 'git push' to update the remote repository. Avoid use --force"
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to amend the commit: {e}")
         sys.exit(1)
 
 
@@ -253,7 +259,7 @@ def main() -> None:
             updated_commit_msg = add_icon_to_commit_message(commit_type, commit_msg)
 
             # Write the updated commit message back to the file
-            write_commit_message(commit_msg_file, updated_commit_msg)
+            amend_commit(updated_commit_msg)
 
             # Inform the user and abort the commit to allow them to review the amended message
             logger.info(
