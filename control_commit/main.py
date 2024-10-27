@@ -227,7 +227,7 @@ def main() -> None:
             logger.debug(f"Commit message already has icon '{icon}'.")
             break
 
-    if icon_present:
+    if icon_present or commit_msg.__contains__("Bump version:"):
         # Validate the commit message without the icon
         if not validate_commit_message(commit_msg_without_icon):
             logger.error("Commit message validation failed after removing icon. Aborting commit.")
