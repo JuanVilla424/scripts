@@ -106,27 +106,81 @@ def configure_logger(log_level: str) -> None:
     logger.addHandler(console_handler)
 
 
-def get_pushed_commits() -> List[str]:
+def get_pushed_refs() -> List[str]:
     """
-    Retrieves the list of commits being pushed.
+    Retrieves the list of refs being pushed.
 
     Returns:
-        List[str]: List of commit hashes.
+        List[str]: List of refs being pushed.
+    """
+    refs = []
+    try:
+        # Read from stdin the refs being pushed
+        for line in sys.stdin:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                local_ref, local_sha = parts[0], parts[1]
+                refs.append(local_ref)
+        logging.debug(f"Refs being pushed: {refs}")
+        return refs
+    except Exception as e:
+        logging.error(f"Error reading refs from stdin: {e}")
+        sys.exit(1)
+
+
+def get_upstream_branch(local_ref: str) -> Optional[str]:
+    """
+    Retrieves the upstream branch for a given local ref.
+
+    Args:
+        local_ref (str): The local ref being pushed.
+
+    Returns:
+        Optional[str]: The upstream branch name or None if not found.
     """
     try:
-        # Fetch the commits being pushed by comparing the local and remote branches
-        process = subprocess.run(
-            ["git", "rev-list", "--no-merges", "origin/master..HEAD"],
+        upstream = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-        )
-        commits = process.stdout.strip().split("\n")
-        logger.debug(f"Commits being pushed: {commits}")
-        return commits if commits != [""] else []
+        ).stdout.strip()
+        logger.debug(f"Upstream branch for {local_ref}: {upstream}")
+        return upstream
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error retrieving pushed commits: {e.stderr}")
+        logger.error(f"Error retrieving upstream branch for {local_ref}: {e.stderr}")
+        return None
+
+
+def get_commits_being_pushed(local_ref: str, remote_ref: str) -> List[str]:
+    """
+    Retrieves the list of commit hashes being pushed for a given ref.
+
+    Args:
+        local_ref (str): The local ref being pushed.
+        remote_ref (str): The remote ref being pushed to.
+
+    Returns:
+        List[str]: List of commit hashes being pushed.
+    """
+    try:
+        commits = (
+            subprocess.run(
+                ["git", "rev-list", "--no-merges", f"{remote_ref}..{local_ref}"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            .stdout.strip()
+            .split("\n")
+        )
+        commits = [commit for commit in commits if commit]
+        logger.debug(f"Commits being pushed for {local_ref}..{remote_ref}: {commits}")
+        return commits
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error retrieving commits for {local_ref}..{remote_ref}: {e.stderr}")
         sys.exit(1)
 
 
@@ -143,14 +197,13 @@ def read_commit_messages(commits: List[str]) -> List[str]:
     commit_messages = []
     for commit in commits:
         try:
-            process = subprocess.run(
+            message = subprocess.run(
                 ["git", "log", "--format=%B", "-n", "1", commit],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-            )
-            message = process.stdout.strip()
+            ).stdout.strip()
             logger.debug(f"Commit {commit}: {message}")
             commit_messages.append(message)
         except subprocess.CalledProcessError as e:
@@ -294,35 +347,44 @@ def main() -> None:
     args = parse_arguments()
     configure_logger(args.log_level)
 
-    # Retrieve commits being pushed
-    pushed_commits = get_pushed_commits()
-    if not pushed_commits:
-        logger.info("No new commits to process.")
+    # Retrieve refs being pushed from stdin
+    pushed_refs = get_pushed_refs()
+    if not pushed_refs:
+        logger.info("No refs being pushed.")
         return
 
-    # Read commit messages
-    commit_messages = read_commit_messages(pushed_commits)
+    for local_ref in pushed_refs:
+        upstream_ref = get_upstream_branch(local_ref)
+        if not upstream_ref:
+            logger.warning(f"No upstream branch found for {local_ref}. Skipping.")
+            continue
 
-    # Process each commit message
-    for commit_msg in commit_messages:
-        updated_commit_msg = add_icon_to_commit_message(commit_msg)
-        version_bump_part = determine_version_bump(commit_msg)
+        commits = get_commits_being_pushed(local_ref, upstream_ref)
+        if not commits:
+            logger.info(f"No new commits to process for {local_ref}.")
+            continue
 
-        if version_bump_part:
-            logger.info(f"Version bump detected: {version_bump_part}")
-            bump_version(version_bump_part)
-            # new_version = get_new_version()
+        commit_messages = read_commit_messages(commits)
 
-            # Stage the updated pyproject.toml
-            stage_changes()
+        for commit_msg in commit_messages:
+            updated_commit_msg = add_icon_to_commit_message(commit_msg)
+            version_bump_part = determine_version_bump(commit_msg)
 
-            # Amend the latest commit with the updated commit message
-            amend_commit(updated_commit_msg)
+            if version_bump_part:
+                logger.info(f"Version bump detected: {version_bump_part}")
+                bump_version(version_bump_part)
+                # new_version = get_new_version()
 
-            # Since we've amended the commit, only one commit needs to be processed
-            break
-        else:
-            logger.info("No version bump detected in commit message.")
+                # Stage the updated pyproject.toml
+                stage_changes()
+
+                # Amend the latest commit with the updated commit message
+                amend_commit(updated_commit_msg)
+
+                # After bumping and amending, stop processing further commits to avoid multiple bumps
+                break
+            else:
+                logger.info("No version bump detected in commit message.")
 
 
 if __name__ == "__main__":
