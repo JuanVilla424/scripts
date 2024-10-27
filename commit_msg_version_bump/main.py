@@ -238,7 +238,7 @@ def amend_commit(new_commit_msg: str) -> None:
         subprocess.run(["git", "commit", "--amend", "-m", new_commit_msg], check=True)
         logger.info("Successfully amended the commit with the new version bump.")
         logger.info(
-            "Please perform a force push using 'git push' to update the remote repository. Avoid use --force"
+            "Please perform a push using 'git push' to update the remote repository. Avoid use --force"
         )
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to amend the commit: {e}")
@@ -283,7 +283,7 @@ def main() -> None:
         amend_commit(updated_commit_msg)
 
         logger.info(
-            "Aborting the current push. Please perform a force push using 'git push'. Avoid use --force"
+            "Aborting the current push. Please perform a push using 'git push'. Avoid use --force"
         )
         sys.exit(1)
     else:
