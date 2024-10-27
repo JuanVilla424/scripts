@@ -2,9 +2,8 @@
 """
 commit_msg_version_bump.py
 
-A script to bump the version in pyproject.toml based on commit message keywords.
-Handles major, minor, and patch releases. Additionally, it adds icons to commit messages
-depending on their type and ensures that changes are committed in a single step.
+A script to bump the version in pyproject.toml based on the latest commit message.
+Adds icons to commit messages depending on their type and ensures that changes are committed in a single step.
 
 Usage:
     commit_msg_version_bump.py [--log-level {INFO,DEBUG}]
@@ -16,20 +15,19 @@ import re
 import subprocess
 import sys
 from logging.handlers import RotatingFileHandler
-from typing import List, Optional, Tuple
+from typing import Optional
 
-import toml
 
-# Mapping of commit types to changelog sections and icons
+# Mapping of commit types to icons
 TYPE_MAPPING = {
-    "feat": {"section": "### Features", "icon": "✨"},
-    "fix": {"section": "### Bug Fixes", "icon": "🐛"},
-    "docs": {"section": "### Documentation", "icon": "📝"},
-    "style": {"section": "### Styles", "icon": "💄"},
-    "refactor": {"section": "### Refactors", "icon": "♻️"},
-    "perf": {"section": "### Performance Improvements", "icon": "⚡️"},
-    "test": {"section": "### Tests", "icon": "✅"},
-    "chore": {"section": "### Chores", "icon": "🔧"},
+    "feat": "✨",
+    "fix": "🐛",
+    "docs": "📝",
+    "style": "💄",
+    "refactor": "♻️",
+    "perf": "⚡️",
+    "test": "✅",
+    "chore": "🔧",
 }
 
 # Mapping of commit types to version bump parts
@@ -65,7 +63,7 @@ def parse_arguments() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Bump the version in pyproject.toml based on commit message keywords. "
+            "Bump the version in pyproject.toml based on the latest commit message. "
             "Adds icons to commit messages depending on their type."
         )
     )
@@ -106,107 +104,26 @@ def configure_logger(log_level: str) -> None:
     logger.addHandler(console_handler)
 
 
-def get_pushed_refs() -> List[Tuple[str, str]]:
+def get_latest_commit_message() -> str:
     """
-    Retrieves the list of refs being pushed.
+    Retrieves the latest commit message.
 
     Returns:
-        List[Tuple[str, str]]: List of tuples containing local_ref and remote_sha.
-    """
-    refs = []
-    try:
-        # Read from stdin the refs being pushed
-        for line in sys.stdin:
-            parts = line.strip().split()
-            if len(parts) >= 4:
-                local_ref, local_sha, remote_ref, remote_sha = parts[:4]
-                refs.append((local_ref, remote_sha))
-        logger.debug(f"Refs being pushed: {refs}")
-        return refs
-    except Exception as e:
-        logger.error(f"Error reading refs from stdin: {e}")
-        sys.exit(1)
-
-
-def get_upstream_branch() -> Optional[str]:
-    """
-    Retrieves the upstream branch for the current branch.
-
-    Returns:
-        Optional[str]: The upstream branch name or None if not found.
+        str: The latest commit message.
     """
     try:
-        upstream = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        message = subprocess.run(
+            ["git", "log", "-1", "--pretty=%B"],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         ).stdout.strip()
-        logger.debug(f"Upstream branch: {upstream}")
-        return upstream
+        logger.debug(f"Latest commit message: {message}")
+        return message
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error retrieving upstream branch: {e.stderr}")
-        return None
-
-
-def get_commits_being_pushed(remote_sha: str, local_sha: str) -> List[str]:
-    """
-    Retrieves the list of commit hashes being pushed for a given ref range.
-
-    Args:
-        remote_sha (str): The remote SHA before the push.
-        local_sha (str): The local SHA being pushed.
-
-    Returns:
-        List[str]: List of commit hashes being pushed.
-    """
-    try:
-        commits = (
-            subprocess.run(
-                ["git", "rev-list", "--no-merges", f"{remote_sha}..{local_sha}"],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            .stdout.strip()
-            .split("\n")
-        )
-        commits = [commit for commit in commits if commit]
-        logger.debug(f"Commits being pushed for {remote_sha}..{local_sha}: {commits}")
-        return commits
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Error retrieving commits for {remote_sha}..{local_sha}: {e.stderr}")
+        logger.error(f"Error retrieving latest commit message: {e.stderr}")
         sys.exit(1)
-
-
-def read_commit_messages(commits: List[str]) -> List[str]:
-    """
-    Reads commit messages for the given list of commits.
-
-    Args:
-        commits (List[str]): List of commit hashes.
-
-    Returns:
-        List[str]: List of commit messages.
-    """
-    commit_messages = []
-    for commit in commits:
-        try:
-            message = subprocess.run(
-                ["git", "log", "--format=%B", "-n", "1", commit],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            ).stdout.strip()
-            logger.debug(f"Commit {commit}: {message}")
-            commit_messages.append(message)
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error reading commit {commit}: {e.stderr}")
-            sys.exit(1)
-    return commit_messages
 
 
 def add_icon_to_commit_message(commit_msg: str) -> str:
@@ -222,7 +139,7 @@ def add_icon_to_commit_message(commit_msg: str) -> str:
     match = COMMIT_TYPE_REGEX.match(commit_msg)
     if match:
         commit_type = match.group("type").lower()
-        icon = TYPE_MAPPING.get(commit_type, {}).get("icon", "")
+        icon = TYPE_MAPPING.get(commit_type, "")
         if icon:
             # Avoid adding multiple icons
             if not commit_msg.startswith(icon):
@@ -279,30 +196,6 @@ def bump_version(part: str) -> None:
         sys.exit(1)
 
 
-def get_new_version(pyproject_path: str = "pyproject.toml") -> str:
-    """
-    Retrieves the new version from pyproject.toml.
-
-    Args:
-        pyproject_path (str): Path to the pyproject.toml file.
-
-    Returns:
-        str: The new version string.
-
-    Raises:
-        SystemExit: If the version cannot be retrieved.
-    """
-    try:
-        with open(pyproject_path, "r", encoding="utf-8") as file:
-            data = toml.load(file)
-        version = data["tool"]["poetry"]["version"]
-        logger.debug(f"New version retrieved: {version}")
-        return version
-    except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError) as e:
-        logger.error(f"Error retrieving the version from {pyproject_path}: {e}")
-        sys.exit(1)
-
-
 def stage_changes(pyproject_path: str = "pyproject.toml") -> None:
     """
     Stages the specified file for commit.
@@ -332,6 +225,9 @@ def amend_commit(new_commit_msg: str) -> None:
         # Amend the commit with the new commit message
         subprocess.run(["git", "commit", "--amend", "-m", new_commit_msg], check=True)
         logger.info("Successfully amended the commit with the new version bump.")
+        logger.info(
+            "Please perform a force push using 'git push --force' to update the remote repository."
+        )
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to amend the commit: {e}")
         sys.exit(1)
@@ -339,57 +235,33 @@ def amend_commit(new_commit_msg: str) -> None:
 
 def main() -> None:
     """
-    Main function to parse commit messages and perform version bumping and commit message enhancement.
+    Main function to parse the latest commit message, add an icon, and perform version bumping.
     """
     args = parse_arguments()
     configure_logger(args.log_level)
 
-    # Retrieve refs being pushed from stdin
-    pushed_refs = get_pushed_refs()
-    if not pushed_refs:
-        logger.info("No refs being pushed.")
-        return
+    latest_commit_msg = get_latest_commit_message()
 
-    for local_ref, remote_sha in pushed_refs:
-        try:
-            local_sha = subprocess.run(
-                ["git", "rev-parse", local_ref],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            ).stdout.strip()
-            logger.debug(f"Local SHA for {local_ref}: {local_sha}")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Error retrieving local SHA for {local_ref}: {e.stderr}")
-            continue
+    updated_commit_msg = add_icon_to_commit_message(latest_commit_msg)
 
-        commits = get_commits_being_pushed(remote_sha, local_sha)
-        if not commits:
-            logger.info(f"No new commits to process for {local_ref}.")
-            continue
+    version_bump_part = determine_version_bump(latest_commit_msg)
 
-        commit_messages = read_commit_messages(commits)
+    if version_bump_part:
+        logger.info(f"Version bump detected: {version_bump_part}")
+        bump_version(version_bump_part)
 
-        for commit_msg in commit_messages:
-            updated_commit_msg = add_icon_to_commit_message(commit_msg)
-            version_bump_part = determine_version_bump(commit_msg)
+        # Stage the updated pyproject.toml
+        stage_changes()
 
-            if version_bump_part:
-                logger.info(f"Version bump detected: {version_bump_part}")
-                bump_version(version_bump_part)
-                # new_version = get_new_version()
+        # Amend the commit with the updated message
+        amend_commit(updated_commit_msg)
 
-                # Stage the updated pyproject.toml
-                stage_changes()
-
-                # Amend the latest commit with the updated commit message
-                amend_commit(updated_commit_msg)
-
-                # After bumping and amending, stop processing further commits to avoid multiple bumps
-                break
-            else:
-                logger.info("No version bump detected in commit message.")
+        logger.info(
+            "Aborting the current push. Please perform a force push using 'git push --force'."
+        )
+        sys.exit(1)
+    else:
+        logger.info("No version bump detected in commit message.")
 
 
 if __name__ == "__main__":
