@@ -12,10 +12,11 @@ Usage:
 
 import argparse
 import logging
+import os
 import re
+from logging.handlers import RotatingFileHandler
 import subprocess
 import sys
-from logging.handlers import RotatingFileHandler
 from typing import Optional
 
 import toml
@@ -45,7 +46,9 @@ VERSION_BUMP_MAPPING = {
 }
 
 # Regular expressions for detecting commit types and versioning keywords
-COMMIT_TYPE_REGEX = re.compile(r"^(?P<type>feat|fix|docs|style|refactor|perf|test|chore)")
+COMMIT_TYPE_REGEX = re.compile(
+    r"^(?P<type>feat|fix|docs|style|refactor|perf|test|chore)", re.IGNORECASE
+)
 VERSION_KEYWORD_REGEX = re.compile(
     r"\[(?P<keyword>major candidate|minor candidate|patch candidate)]$", re.IGNORECASE
 )
@@ -66,6 +69,11 @@ def parse_arguments() -> argparse.Namespace:
             "Bump the version in pyproject.toml based on commit message keywords. "
             "Adds icons to commit messages depending on their type."
         )
+    )
+    parser.add_argument(
+        "commit_msg_file",
+        type=str,
+        help="Path to the commit message file.",
     )
     parser.add_argument(
         "--log-level",
@@ -90,8 +98,8 @@ def configure_logger(log_level: str) -> None:
     logger.setLevel(numeric_level)
 
     # Set up log rotation: max size 5MB, keep 5 backup files
-    file_handler = RotatingFileHandler(
-        "commit_msg_version_dump.log", maxBytes=5 * 1024 * 1024, backupCount=5
+    file_handler = logging.handlers.RotatingFileHandler(
+        "commit_msg_version_bump.log", maxBytes=5 * 1024 * 1024, backupCount=5
     )
     console_handler = logging.StreamHandler()
 
@@ -99,7 +107,10 @@ def configure_logger(log_level: str) -> None:
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 
-    logger.handlers.clear()
+    # Clear existing handlers
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
@@ -259,22 +270,26 @@ def main() -> None:
     """
     Main function to parse the commit message and perform version bumping and commit message enhancement.
     """
+    args = parse_arguments()
+    configure_logger(args.log_level)
 
-    commit_msg = read_commit_message(".git/COMMIT_EDITMSG")
+    # Pre-commit sets the commit message file as the first argument for commit-msg hooks
+    if len(sys.argv) < 2:
+        logger.error("Commit message file path not provided.")
+        sys.exit(1)
+
+    commit_msg_file = sys.argv[1]
+    commit_msg = read_commit_message(commit_msg_file)
     updated_commit_msg = add_icon_to_commit_message(commit_msg)
     version_bump_part = determine_version_bump(commit_msg)
 
     if version_bump_part:
         logger.info(f"Version bump detected: {version_bump_part}")
         bump_version(version_bump_part)
-        # new_version = get_new_version()
+        new_version = get_new_version()
 
         # Stage the updated pyproject.toml
         stage_changes()
-
-        # Optionally, TODO: you can add the new version to the commit message
-        # For simplicity, we'll update the commit message with the icon only
-        # If needed, modify this section to include the new version in the commit message
 
         # Amend the commit with the updated commit message
         amend_commit(updated_commit_msg)
@@ -283,6 +298,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    args = parse_arguments()
-    configure_logger(args.log_level)
     main()
