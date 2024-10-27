@@ -134,3 +134,4 @@ $RECYCLE.BIN/
 *.sw?
 
 scripts
+*/certs/
