@@ -123,10 +123,10 @@ def get_pushed_commits() -> List[str]:
             text=True,
         )
         commits = process.stdout.strip().split("\n")
-        logging.debug(f"Commits being pushed: {commits}")
+        logger.debug(f"Commits being pushed: {commits}")
         return commits if commits != [""] else []
     except subprocess.CalledProcessError as e:
-        logging.error(f"Error retrieving pushed commits: {e.stderr}")
+        logger.error(f"Error retrieving pushed commits: {e.stderr}")
         sys.exit(1)
 
 
@@ -151,10 +151,10 @@ def read_commit_messages(commits: List[str]) -> List[str]:
                 text=True,
             )
             message = process.stdout.strip()
-            logging.debug(f"Commit {commit}: {message}")
+            logger.debug(f"Commit {commit}: {message}")
             commit_messages.append(message)
         except subprocess.CalledProcessError as e:
-            logging.error(f"Error reading commit {commit}: {e.stderr}")
+            logger.error(f"Error reading commit {commit}: {e.stderr}")
             sys.exit(1)
     return commit_messages
 
@@ -177,9 +177,9 @@ def add_icon_to_commit_message(commit_msg: str) -> str:
             # Avoid adding multiple icons
             if not commit_msg.startswith(icon):
                 new_commit_msg = f"{icon} {commit_msg}"
-                logging.debug(f"Updated commit message with icon: {new_commit_msg}")
+                logger.debug(f"Updated commit message with icon: {new_commit_msg}")
                 return new_commit_msg
-    logging.debug("No matching commit type found or icon already present.")
+    logger.debug("No matching commit type found or icon already present.")
     return commit_msg
 
 
@@ -223,9 +223,9 @@ def bump_version(part: str) -> None:
     """
     try:
         subprocess.run(["bump2version", part], check=True)
-        logging.info(f"Successfully bumped the {part} version.")
+        logger.info(f"Successfully bumped the {part} version.")
     except subprocess.CalledProcessError as error:
-        logging.error(f"Failed to bump the {part} version: {error}")
+        logger.error(f"Failed to bump the {part} version: {error}")
         sys.exit(1)
 
 
@@ -246,10 +246,10 @@ def get_new_version(pyproject_path: str = "pyproject.toml") -> str:
         with open(pyproject_path, "r", encoding="utf-8") as file:
             data = toml.load(file)
         version = data["tool"]["poetry"]["version"]
-        logging.debug(f"New version retrieved: {version}")
+        logger.debug(f"New version retrieved: {version}")
         return version
     except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError) as e:
-        logging.error(f"Error retrieving the version from {pyproject_path}: {e}")
+        logger.error(f"Error retrieving the version from {pyproject_path}: {e}")
         sys.exit(1)
 
 
@@ -262,9 +262,9 @@ def stage_changes(pyproject_path: str = "pyproject.toml") -> None:
     """
     try:
         subprocess.run(["git", "add", pyproject_path], check=True)
-        logging.debug(f"Staged {pyproject_path} for commit.")
+        logger.debug(f"Staged {pyproject_path} for commit.")
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to stage {pyproject_path}: {e}")
+        logger.error(f"Failed to stage {pyproject_path}: {e}")
         sys.exit(1)
 
 
@@ -281,9 +281,9 @@ def amend_commit(new_commit_msg: str) -> None:
     try:
         # Amend the commit with the new commit message
         subprocess.run(["git", "commit", "--amend", "-m", new_commit_msg], check=True)
-        logging.info("Successfully amended the commit with the new version bump.")
+        logger.info("Successfully amended the commit with the new version bump.")
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to amend the commit: {e}")
+        logger.error(f"Failed to amend the commit: {e}")
         sys.exit(1)
 
 
@@ -297,7 +297,7 @@ def main() -> None:
     # Retrieve commits being pushed
     pushed_commits = get_pushed_commits()
     if not pushed_commits:
-        logging.info("No new commits to process.")
+        logger.info("No new commits to process.")
         return
 
     # Read commit messages
@@ -309,7 +309,7 @@ def main() -> None:
         version_bump_part = determine_version_bump(commit_msg)
 
         if version_bump_part:
-            logging.info(f"Version bump detected: {version_bump_part}")
+            logger.info(f"Version bump detected: {version_bump_part}")
             bump_version(version_bump_part)
             # new_version = get_new_version()
 
@@ -322,7 +322,7 @@ def main() -> None:
             # Since we've amended the commit, only one commit needs to be processed
             break
         else:
-            logging.info("No version bump detected in commit message.")
+            logger.info("No version bump detected in commit message.")
 
 
 if __name__ == "__main__":
