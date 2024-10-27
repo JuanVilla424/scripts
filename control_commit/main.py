@@ -138,7 +138,7 @@ def validate_commit_message(commit_msg: str) -> bool:
         bool: True if valid, False otherwise.
     """
     match = COMMIT_MESSAGE_REGEX.match(commit_msg)
-    if match:
+    if match or commit_msg.__contains__("Bump version:"):
         logger.debug("Commit message structure is valid.")
         return True
     else:
