@@ -3,7 +3,8 @@
 commit_msg_version_bump.py
 
 A script to bump the version in pyproject.toml based on the latest commit message.
-Adds icons to commit messages depending on their type and ensures that changes are committed in a single step.
+Changes the commit message to include the version bump and adds an icon.
+Ensures that changes are committed in a single step.
 
 Usage:
     commit_msg_version_bump.py [--log-level {INFO,DEBUG}]
@@ -17,6 +18,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 from typing import Optional
 
+import toml
 
 # Mapping of commit types to icons
 TYPE_MAPPING = {
@@ -126,56 +128,66 @@ def get_latest_commit_message() -> str:
         sys.exit(1)
 
 
-def add_icon_to_commit_message(commit_msg: str) -> str:
+def get_current_version(pyproject_path: str = "pyproject.toml") -> str:
     """
-    Adds an icon to the commit message based on its type.
+    Retrieves the current version from pyproject.toml.
 
     Args:
-        commit_msg (str): The original commit message.
+        pyproject_path (str): Path to the pyproject.toml file.
 
     Returns:
-        str: The commit message with the icon prepended.
+        str: The current version string.
     """
-    match = COMMIT_TYPE_REGEX.match(commit_msg)
-    if match:
-        commit_type = match.group("type").lower()
-        icon = TYPE_MAPPING.get(commit_type, "")
-        if icon:
-            # Avoid adding multiple icons
-            if not commit_msg.startswith(icon):
-                new_commit_msg = f"{icon} {commit_msg}"
-                logger.debug(f"Updated commit message with icon: {new_commit_msg}")
-                return new_commit_msg
-    logger.debug("No matching commit type found or icon already present.")
-    return commit_msg
+    try:
+        with open(pyproject_path, "r", encoding="utf-8") as file:
+            data = toml.load(file)
+        version = data["tool"]["poetry"]["version"]
+        logger.debug(f"Current version: {version}")
+        return version
+    except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError) as e:
+        logger.error(f"Error retrieving the version from {pyproject_path}: {e}")
+        sys.exit(1)
 
 
-def determine_version_bump(commit_msg: str) -> Optional[str]:
+def get_new_version(pyproject_path: str = "pyproject.toml") -> str:
     """
-    Determines the version bump part based on the commit message.
+    Retrieves the new version from pyproject.toml after bump.
 
     Args:
-        commit_msg (str): The commit message.
+        pyproject_path (str): Path to the pyproject.toml file.
 
     Returns:
-        Optional[str]: The version part to bump ('major', 'minor', 'patch') or None.
+        str: The new version string.
     """
-    match = VERSION_KEYWORD_REGEX.search(commit_msg)
-    if match:
-        keyword = match.group("keyword").lower()
-        if "major" in keyword:
-            return "major"
-        elif "minor" in keyword:
-            return "minor"
-        elif "patch" in keyword:
-            return "patch"
-    else:
-        # Fallback based on commit type
-        type_match = COMMIT_TYPE_REGEX.match(commit_msg)
-        if type_match:
-            commit_type = type_match.group("type").lower()
-            return VERSION_BUMP_MAPPING.get(commit_type)
-    return None
+    try:
+        with open(pyproject_path, "r", encoding="utf-8") as file:
+            data = toml.load(file)
+        new_version = data["tool"]["poetry"]["version"]
+        logger.debug(f"New version: {new_version}")
+        return new_version
+    except (FileNotFoundError, KeyError, ValueError, toml.TomlDecodeError) as e:
+        logger.error(f"Error retrieving the new version from {pyproject_path}: {e}")
+        sys.exit(1)
+
+
+def add_icon_and_prepare_commit_message(
+    commit_type: str, current_version: str, new_version: str
+) -> str:
+    """
+    Prepares the new commit message with the icon and version bump.
+
+    Args:
+        commit_type (str): The type of the commit (e.g., 'chore', 'fix').
+        current_version (str): The current version before bump.
+        new_version (str): The new version after bump.
+
+    Returns:
+        str: The new commit message.
+    """
+    icon = TYPE_MAPPING.get(commit_type.lower(), "")
+    new_commit_msg = f"{icon} Bump version: {current_version} → {new_version}"
+    logger.debug(f"New commit message: {new_commit_msg}")
+    return new_commit_msg
 
 
 def bump_version(part: str) -> None:
@@ -235,25 +247,39 @@ def amend_commit(new_commit_msg: str) -> None:
 
 def main() -> None:
     """
-    Main function to parse the latest commit message, add an icon, and perform version bumping.
+    Main function to parse the latest commit message, add an icon, perform version bumping, and amend the commit.
     """
     args = parse_arguments()
     configure_logger(args.log_level)
 
     latest_commit_msg = get_latest_commit_message()
 
-    updated_commit_msg = add_icon_to_commit_message(latest_commit_msg)
+    type_match = COMMIT_TYPE_REGEX.match(latest_commit_msg)
+    if type_match:
+        commit_type = type_match.group("type")
+        logger.debug(f"Detected commit type: {commit_type}")
+    else:
+        commit_type = "chore"  # Default to 'chore' if no type is found
+        logger.debug("No commit type detected. Defaulting to 'chore'.")
 
     version_bump_part = determine_version_bump(latest_commit_msg)
 
     if version_bump_part:
         logger.info(f"Version bump detected: {version_bump_part}")
+
+        current_version = get_current_version()
+
         bump_version(version_bump_part)
+
+        new_version = get_new_version()
+
+        updated_commit_msg = add_icon_and_prepare_commit_message(
+            commit_type, current_version, new_version
+        )
 
         # Stage the updated pyproject.toml
         stage_changes()
 
-        # Amend the commit with the updated message
         amend_commit(updated_commit_msg)
 
         logger.info(
@@ -262,6 +288,34 @@ def main() -> None:
         sys.exit(1)
     else:
         logger.info("No version bump detected in commit message.")
+
+
+def determine_version_bump(commit_msg: str) -> Optional[str]:
+    """
+    Determines the version bump part based on the commit message.
+
+    Args:
+        commit_msg (str): The commit message.
+
+    Returns:
+        Optional[str]: The version part to bump ('major', 'minor', 'patch') or None.
+    """
+    match = VERSION_KEYWORD_REGEX.search(commit_msg)
+    if match:
+        keyword = match.group("keyword").lower()
+        if "major" in keyword:
+            return "major"
+        elif "minor" in keyword:
+            return "minor"
+        elif "patch" in keyword:
+            return "patch"
+    else:
+        # Fallback based on commit type
+        type_match = COMMIT_TYPE_REGEX.match(commit_msg)
+        if type_match:
+            commit_type = type_match.group("type").lower()
+            return VERSION_BUMP_MAPPING.get(commit_type)
+    return None
 
 
 if __name__ == "__main__":
