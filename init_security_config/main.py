@@ -1,375 +1,360 @@
+#!/usr/bin/env python3
+"""
+Variable Replacement Script
+
+This script processes specified files to replace placeholders with defined variables
+or randomly generated strings. It supports various placeholder formats and ensures
+that the files adhere to specified formatting rules.
+
+Usage:
+    python variable_replacer.py --files <file1> <file2> ... [--log-level LEVEL]
+
+Example:
+    python variable_replacer.py --files .env.example config/settings.ini --log-level DEBUG
+"""
+
+import argparse
+import logging
+import os
 import re
-import sys
 import random
 import string
-import os
-import shutil
+from logging.handlers import RotatingFileHandler
 
 
-def generate_random_string(length, chars_type):
+class ArgumentParser:
     """
-    Generates a random string based on the specified type.
-
-    Args:
-        length (int): The length of the generated string.
-        chars_type (str): The type of characters to include ('Chars' or 'Chars-with-specials').
-
-    Returns:
-        str: The generated random string.
+    Parses command-line arguments for the script.
     """
-    if chars_type == "Chars":
-        characters = string.ascii_letters + string.digits
-    elif chars_type == "Chars-with-specials":
-        # Exclude single quotes, double quotes, and backslashes, $, :, &, @, [], (), /, |
-        characters = string.ascii_letters + string.digits + "!#%*-_=+;,."
-    else:
-        characters = string.ascii_letters + string.digits  # Default to 'Chars' if unknown
 
-    return "".join(random.choice(characters) for _ in range(length))
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(
+            description=(
+                "Replace placeholders in specified files with defined variables or randomly generated strings. "
+                "Supports placeholders like <VAR_NAME> and <number (Chars)>."
+            )
+        )
+        self.parser.add_argument(
+            "--files",
+            nargs="+",
+            required=True,
+            help="List of file paths to process.",
+        )
+        self.parser.add_argument(
+            "--log-level",
+            choices=["INFO", "DEBUG"],
+            default="INFO",
+            help="Set the logging level. Default is INFO.",
+        )
+
+    def parse(self) -> argparse.Namespace:
+        """
+        Parses the command-line arguments.
+
+        Returns:
+            argparse.Namespace: Parsed arguments.
+        """
+        return self.parser.parse_args()
 
 
-def replace_placeholders(line, variables):
+class LoggerConfigurator:
     """
-    Replaces placeholders in a line based on defined patterns.
-
-    Args:
-        line (str): The line containing placeholders.
-        variables (dict): Dictionary of previously defined variables.
-
-    Returns:
-        str: The line with placeholders replaced.
+    Configures logging for the script.
     """
-    # Pattern for <number (Chars)> and <number (Chars-with-specials)>
-    placeholder_pattern = re.compile(r"<(\d+)\s*\((Chars(?:-with-specials)?)\)>")
 
-    def placeholder_replacer(match):
-        length = int(match.group(1))
-        chars_type = match.group(2)
-        return generate_random_string(length, chars_type)
+    def __init__(self, log_level: str, log_file: str = "variable_replacer.log"):
+        """
+        Initializes the LoggerConfigurator.
 
-    # Replace all <number (Chars)> and <number (Chars-with-specials)> placeholders
-    line = placeholder_pattern.sub(placeholder_replacer, line)
+        Args:
+            log_level (str): Logging level as a string (e.g., 'INFO', 'DEBUG').
+            log_file (str): Path to the log file.
+        """
+        self.logger = logging.getLogger(__name__)
+        self.configure_logger(log_level, log_file)
 
-    # Pattern for variables like <VAR_NAME>
-    var_pattern = re.compile(r"<([A-Z_]+)>")
+    def configure_logger(self, log_level: str, log_file: str) -> None:
+        """
+        Configures the logger with file and console handlers.
 
-    def var_replacer(match):
-        var_name = match.group(1)
-        if var_name in variables:
-            return variables[var_name]
-        print(f"[WARNING] Undefined variable '{var_name}' encountered. Placeholder left as-is.")
-        return match.group(0)  # Leave the placeholder as-is if not defined
+        Args:
+            log_level (str): Logging level.
+            log_file (str): Path to the log file.
+        """
+        numeric_level = getattr(logging, log_level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError(f"Invalid log level: {log_level}")
 
-    # Replace <VAR_NAME> placeholders with their corresponding values
-    line = var_pattern.sub(var_replacer, line)
-    return line
+        self.logger.setLevel(numeric_level)
+
+        # File handler with rotation
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=5 * 1024 * 1024,  # 5 MB
+            backupCount=5,
+            encoding="utf-8",
+        )
+        file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        file_handler.setFormatter(file_formatter)
+
+        # Safe console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(file_formatter)
+        console_handler.setLevel(numeric_level)
+
+        # Clear existing handlers and add new ones
+        if self.logger.hasHandlers():
+            self.logger.handlers.clear()
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
 
 
-def remove_comments(line):
+class VariableReplacer:
     """
-    Removes inline comments from a line. Leaves full-line comments intact.
-
-    Args:
-        line (str): The line from which to remove comments.
-
-    Returns:
-        str: The line without inline comments. Full-line comments are left intact.
+    Handles the replacement of placeholders in files with variables or generated strings.
     """
-    stripped_line = line.lstrip()
-    if stripped_line.startswith("#"):
-        return line  # Leave full-line comments intact
 
-    result = []
-    in_single_quote = False
-    in_double_quote = False
+    PLACEHOLDER_PATTERN = re.compile(r"<(\d+)\s*\((Chars(?:-with-specials)?)\)>")
+    VARIABLE_PATTERN = re.compile(r"<([A-Z_]+)>")
+    VARIABLE_DEFINITION_PATTERN = re.compile(r'^([A-Z_]+)=["\']?(.*?)["\']?$')
 
-    for char in line:
-        if char == "'" and not in_double_quote:
-            in_single_quote = not in_single_quote
-        elif char == '"' and not in_single_quote:
-            in_double_quote = not in_double_quote
-        elif char == "#" and not in_single_quote and not in_double_quote:
-            break  # Ignore the rest of the line after '#'
-        result.append(char)
+    def __init__(self, logger: logging.Logger):
+        """
+        Initializes the VariableReplacer.
 
-    return "".join(result).rstrip()
+        Args:
+            logger (logging.Logger): Logger instance for logging.
+        """
+        self.logger = logger
+        self.variables = {}
 
+    def generate_random_string(self, length: int, chars_type: str) -> str:
+        """
+        Generates a random string based on the specified type.
 
-def clean_spaces(line):
-    """
-    Cleans unnecessary spaces from a line.
+        Args:
+            length (int): The length of the generated string.
+            chars_type (str): The type of characters to include ('Chars' or 'Chars-with-specials').
 
-    Args:
-        line (str): The line to clean.
-
-    Returns:
-        str: The cleaned line.
-    """
-    # Remove leading and trailing spaces
-    line = line.strip()
-    # Replace multiple spaces with a single space
-    line = re.sub(r"\s+", " ", line)
-    return line
-
-
-def collect_variables(line, variables):
-    """
-    Collects variable definitions from a line and updates the variables dictionary.
-
-    Args:
-        line (str): The line containing variable definition.
-        variables (dict): Dictionary to store variable names and their values.
-
-    Returns:
-        tuple:
-            str: The updated line with placeholders replaced.
-            bool: Indicates whether a variable was defined.
-    """
-    # Pattern to capture lines like VAR_NAME=valor
-    var_def_pattern = re.compile(r'^([A-Z_]+)=["\']?(.*?)["\']?$')
-    match = var_def_pattern.match(line)
-    if match:
-        var_name = match.group(1)
-        var_value = match.group(2)
-        # Replace placeholders within the variable value
-        var_value_replaced = replace_placeholders(var_value, variables)
-        variables[var_name] = var_value_replaced
-        # Reconstruct the line with the replaced value
-        # Preserve the original quotes if they were present
-        if line.strip().startswith(var_name + "='") or line.strip().startswith(var_name + '="'):
-            quote_char = line.strip()[len(var_name) + 1]
-            line_final = f"{var_name}={quote_char}{var_value_replaced}{quote_char}"
+        Returns:
+            str: The generated random string.
+        """
+        if chars_type == "Chars":
+            characters = string.ascii_letters + string.digits
+        elif chars_type == "Chars-with-specials":
+            # Exclude problematic characters
+            characters = string.ascii_letters + string.digits + "!#%*-_=+;,."
         else:
-            line_final = f"{var_name}={var_value_replaced}"
-        return line_final, True  # Indicate that a variable was defined
-    return line, False  # No variable defined
+            characters = string.ascii_letters + string.digits  # Default to 'Chars'
 
+        random_str = "".join(random.choice(characters) for _ in range(length))
+        self.logger.debug(f"Generated random string: {random_str}")
+        return random_str
 
-def format_env_file(file_path, variables):
-    """
-    Formats a .env.example file by replacing placeholders, replacing variables,
-    removing inline comments, and cleaning spaces.
+    def replace_placeholders(self, line: str) -> str:
+        """
+        Replaces placeholders in a line based on defined patterns.
 
-    Args:
-        file_path (str): Path to the .env.example file.
-        variables (dict): Dictionary of previously defined variables.
+        Args:
+            line (str): The line containing placeholders.
 
-    Returns:
-        None
-    """
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-    except FileNotFoundError:
-        print(f"[ERROR] The file {file_path} does not exist.")
-        sys.exit(1)
+        Returns:
+            str: The line with placeholders replaced.
+        """
+        # Replace <number (Chars)> and <number (Chars-with-specials)>
+        line = self.PLACEHOLDER_PATTERN.sub(
+            lambda match: self.generate_random_string(int(match.group(1)), match.group(2)),
+            line,
+        )
 
-    formatted_lines = []
+        # Replace <VAR_NAME> with defined variables
+        line = self.VARIABLE_PATTERN.sub(self.variable_replacer, line)
+        return line
 
-    for i, line in enumerate(lines, start=1):
-        original_line = line.rstrip("\n")
+    def variable_replacer(self, match: re.Match) -> str:
+        """
+        Replacer function for variable placeholders.
 
-        # Step 1: Remove inline comments (leave full-line comments intact)
-        line_no_comments = remove_comments(original_line)
+        Args:
+            match (re.Match): Regex match object.
 
-        # Step 2: Clean unnecessary spaces
-        line_cleaned = clean_spaces(line_no_comments)
-
-        # Step 3: Check if the line is a variable definition and collect variables
-        line_processed, is_var_def = collect_variables(line_cleaned, variables)
-
-        if is_var_def:
-            # If it's a variable definition, add the updated line
-            if line_processed != original_line.strip():
-                print(f"[FORMAT] Modified variable definition on line {i} in {file_path}.")
-            formatted_lines.append(line_processed)
+        Returns:
+            str: Replacement string.
+        """
+        var_name = match.group(1)
+        if var_name in self.variables:
+            self.logger.debug(f"Replacing variable <{var_name}> with {self.variables[var_name]}")
+            return self.variables[var_name]
         else:
-            # Step 4: Replace variable placeholders in non-variable lines
-            line_replaced = replace_placeholders(line_cleaned, variables)
+            self.logger.warning(
+                f"Undefined variable '{var_name}' encountered. Placeholder left as-is."
+            )
+            return match.group(0)  # Leave the placeholder as-is
 
-            if line_replaced != line_cleaned:
-                print(f"[FORMAT] Modified line {i} in {file_path}.")
+    def remove_inline_comments(self, line: str) -> str:
+        """
+        Removes inline comments from a line. Leaves full-line comments intact.
 
-            # Step 5: Add the formatted line if it's not empty
-            if line_replaced:
-                formatted_lines.append(line_replaced)
-            else:
-                # If the line is empty after cleaning (e.g., was a comment-only line), do not add it
-                print(f"[FORMAT] Removed empty or comment-only line {i} in {file_path}.")
+        Args:
+            line (str): The line from which to remove comments.
 
-    # Combine all formatted lines
-    formatted_content = "\n".join(formatted_lines) + "\n"
+        Returns:
+            str: The line without inline comments.
+        """
+        stripped_line = line.lstrip()
+        if stripped_line.startswith("#"):
+            return line  # Leave full-line comments intact
 
-    # Write the formatted content back to the file
-    with open(file_path, "w", newline="\n", encoding="utf-8") as f:
-        f.write(formatted_content)
-
-    print(f"[FORMAT] Formatted {file_path} successfully.")
-
-
-def format_js_file(file_path, variables):
-    """
-    Formats a JavaScript (.js) file by replacing placeholders, replacing variables,
-    removing inline comments, cleaning spaces, and ensuring proper indentation.
-
-    Args:
-        file_path (str): Path to the JavaScript file to format.
-        variables (dict): Dictionary of previously defined variables.
-
-    Returns:
-        None
-    """
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            js_lines = f.readlines()
-    except FileNotFoundError:
-        print(f"[ERROR] The file {file_path} does not exist.")
-        return
-
-    formatted_lines = []
-    indent_level = 0
-    indent_size = 4  # Number of spaces for each indent level
-
-    for i, line in enumerate(js_lines, start=1):
-        original_line = line.rstrip("\n")
-
-        # Step 1: Remove inline comments (leave full-line comments intact)
-        line_no_comments = remove_comments(original_line)
-
-        # Step 2: Clean unnecessary spaces
-        line_cleaned = clean_spaces(line_no_comments)
-
-        # Step 3: Replace placeholders
-        line_replaced = replace_placeholders(line_cleaned, variables)
-
-        if line_replaced != line_cleaned:
-            print(f"[FORMAT] Modified line {i} in {file_path}.")
-
-        # Step 4: Determine if the line affects indentation
-        # Decrease indent level if the line starts with a closing brace
-        if line_replaced.startswith("}") and not line_replaced.endswith("},"):
-            indent_level = max(indent_level - 1, 0)
-        if line_replaced.startswith("}") and not line_replaced.endswith("],"):
-            indent_level = max(indent_level - 1, 0)
-
-        # Apply indentation
-        indented_line = " " * (indent_size * indent_level) + line_replaced
-        formatted_lines.append(indented_line)
-
-        # Step 5: Adjust indent level based on braces
-        # Avoid counting braces within strings
+        result = []
         in_single_quote = False
         in_double_quote = False
-        escape_char = False
-        for char in line_replaced:
-            if escape_char:
-                escape_char = False
-                continue
-            if char == "\\":
-                escape_char = True
-                continue
+
+        for char in line:
             if char == "'" and not in_double_quote:
                 in_single_quote = not in_single_quote
-                continue
-            if char == '"' and not in_single_quote:
+            elif char == '"' and not in_single_quote:
                 in_double_quote = not in_double_quote
-                continue
-            if in_single_quote or in_double_quote:
-                continue
-            if char == "{":
-                indent_level += 1
-            elif char == "}":
-                indent_level = max(indent_level - 1, 0)
-            if char == "[":
-                indent_level += 1
-            elif char == "]":
-                indent_level = max(indent_level - 1, 0)
+            elif char == "#" and not in_single_quote and not in_double_quote:
+                break  # Ignore the rest of the line after '#'
+            result.append(char)
 
-    # Combine all formatted lines
-    formatted_content = "\n".join(formatted_lines) + "\n"
+        cleaned_line = "".join(result).rstrip()
+        self.logger.debug(f"Removed inline comments: '{line}' -> '{cleaned_line}'")
+        return cleaned_line
 
-    # Write the formatted content back to the file
-    with open(file_path, "w", newline="\n", encoding="utf-8") as f:
-        f.write(formatted_content)
+    def clean_spaces(self, line: str) -> str:
+        """
+        Cleans unnecessary spaces from a line.
 
-    print(f"[FORMAT] Formatted {file_path} successfully.")
+        Args:
+            line (str): The line to clean.
 
+        Returns:
+            str: The cleaned line.
+        """
+        original_line = line
+        line = line.strip()
+        line = re.sub(r"\s+", " ", line)
+        self.logger.debug(f"Cleaned spaces: '{original_line}' -> '{line}'")
+        return line
 
-def ensure_js_file(default_js_path, template_js_path):
-    """
-    Ensures that the JavaScript file exists. If not, creates it from the template.
+    def collect_variables(self, line: str) -> (str, bool):
+        """
+        Collects variable definitions from a line and updates the variables dictionary.
 
-    Args:
-        default_js_path (str): The default path to the JavaScript file.
-        template_js_path (str): The path to the template JavaScript file.
+        Args:
+            line (str): The line containing variable definition.
 
-    Returns:
-        None
-    """
-    if not os.path.exists(default_js_path):
-        if os.path.exists(template_js_path):
-            # Create directories if they do not exist
-            os.makedirs(os.path.dirname(default_js_path), exist_ok=True)
-            shutil.copyfile(template_js_path, default_js_path)
-            print(f"[INFO] Created JavaScript file from template: {default_js_path}")
-        else:
-            print(f"[ERROR] Template JavaScript file does not exist: {template_js_path}")
-            sys.exit(1)
-    else:
-        print(f"[INFO] JavaScript file already exists: {default_js_path}")
+        Returns:
+            tuple:
+                str: The updated line with placeholders replaced.
+                bool: Indicates whether a variable was defined.
+        """
+        match = self.VARIABLE_DEFINITION_PATTERN.match(line)
+        if match:
+            var_name = match.group(1)
+            var_value = match.group(2)
+            self.logger.debug(f"Found variable definition: {var_name}={var_value}")
 
+            # Replace placeholders within the variable value
+            var_value_replaced = self.replace_placeholders(var_value)
+            self.variables[var_name] = var_value_replaced
 
-def format_file(file_path, variables):
-    """
-    Determines the file type and applies appropriate formatting.
+            # Reconstruct the line with the replaced value
+            quote_match = re.match(rf'^{var_name}=([\'"])(.*)\1$', line)
+            if quote_match:
+                quote_char = quote_match.group(1)
+                line_final = f"{var_name}={quote_char}{var_value_replaced}{quote_char}"
+            else:
+                line_final = f"{var_name}={var_value_replaced}"
+            self.logger.info(f"Defined variable '{var_name}' with value '{var_value_replaced}'")
+            return line_final, True
 
-    Args:
-        file_path (str): Path to the file to format.
-        variables (dict): Dictionary of previously defined variables.
+        return line, False
 
-    Returns:
-        None
-    """
-    if file_path.endswith(".env") or file_path.endswith(".env.example") or ".env." in file_path:
-        format_env_file(file_path, variables)
-    elif file_path.endswith(".js"):
-        format_js_file(file_path, variables)
-    else:
-        print(f"[INFO] Skipping unsupported file type: {file_path}")
+    def process_file(self, file_path: str) -> None:
+        """
+        Processes a file by replacing placeholders and formatting lines.
+
+        Args:
+            file_path (str): Path to the file to process.
+        """
+        if not os.path.exists(file_path):
+            self.logger.error(f"The file {file_path} does not exist.")
+            return
+
+        self.logger.info(f"Processing file: {file_path}")
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            self.logger.error(f"Failed to read {file_path}: {e}")
+            return
+
+        formatted_lines = []
+
+        for i, line in enumerate(lines, start=1):
+            original_line = line.rstrip("\n")
+            self.logger.debug(f"Original line {i}: {original_line}")
+
+            # Step 1: Remove inline comments (leave full-line comments intact)
+            line_no_comments = self.remove_inline_comments(original_line)
+
+            # Step 2: Clean unnecessary spaces
+            line_cleaned = self.clean_spaces(line_no_comments)
+
+            # Step 3: Check if the line is a variable definition and collect variables
+            line_processed, is_var_def = self.collect_variables(line_cleaned)
+
+            if is_var_def:
+                # If it's a variable definition, add the updated line
+                if line_processed != original_line.strip():
+                    self.logger.info(f"Modified variable definition on line {i} in {file_path}.")
+                formatted_lines.append(line_processed)
+            else:
+                # Step 4: Replace variable placeholders in non-variable lines
+                line_replaced = self.replace_placeholders(line_cleaned)
+
+                if line_replaced != line_cleaned:
+                    self.logger.debug(f"Modified line {i} in {file_path}.")
+
+                # Step 5: Add the formatted line if it's not empty
+                if line_replaced:
+                    formatted_lines.append(line_replaced)
+                else:
+                    # If the line is empty after cleaning (e.g., was a comment-only line), do not add it
+                    self.logger.debug(f"Removed empty or comment-only line {i} in {file_path}.")
+
+        # Combine all formatted lines
+        formatted_content = "\n".join(formatted_lines) + "\n"
+
+        try:
+            with open(file_path, "w", newline="\n", encoding="utf-8") as f:
+                f.write(formatted_content)
+            self.logger.info(f"Formatted {file_path} successfully.")
+        except Exception as e:
+            self.logger.error(f"Failed to write to {file_path}: {e}")
 
 
 def main():
     """
-    Main function to handle command-line arguments and initiate file formatting.
-
-    Usage:
-        python init_security_config.py <path_to_env.example> [<path_to_js_file>]
+    Main function to handle command-line arguments and initiate file processing.
     """
-    if len(sys.argv) < 2:
-        print("Usage: python init_security_config.py <path_to_env.example> [<path_to_js_file>]")
-        sys.exit(1)
+    # Parse arguments
+    arg_parser = ArgumentParser()
+    args = arg_parser.parse()
 
-    env_file_path = sys.argv[1]
-    if len(sys.argv) >= 3:
-        js_file_path = sys.argv[2]
-    else:
-        # Set default JavaScript file path
-        js_file_path = os.path.join("yoguis_tickets_database", "initdb.d", "mongo-init.js")
-        template_js_path = os.path.join(
-            "yoguis_tickets_database", "initdb.d", "mongo-init.example.js"
-        )
-        ensure_js_file(js_file_path, template_js_path)
+    # Configure logger
+    logger_config = LoggerConfigurator(log_level=args.log_level)
+    logger = logger_config.logger
 
-    variables = {}
+    # Initialize VariableReplacer
+    replacer = VariableReplacer(logger)
 
-    # Process the .env.example file
-    print(f"\nProcessing file: {env_file_path}")
-    format_file(env_file_path, variables)
-
-    # Process the JavaScript file
-    if js_file_path:
-        print(f"\nProcessing file: {js_file_path}")
-        format_file(js_file_path, variables)
+    # Process each specified file
+    for file_path in args.files:
+        replacer.process_file(file_path)
 
 
 if __name__ == "__main__":
