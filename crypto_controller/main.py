@@ -398,7 +398,7 @@ class CryptoController:
             # Parse the date string
             expiration_date = datetime.strptime(expiration_str, "%d%m%Y%H%M%S")
             # Return the date in ISO format
-            logger.info(f"Expiration date retrieved successfully: {expiration_date.isoformat()}")
+            logger.debug(f"Expiration date retrieved successfully: {expiration_date.isoformat()}")
             return expiration_date.isoformat()
         except Exception as error:
             logger.error(f"Failed to get expiration date: {error}", exc_info=True)
@@ -439,7 +439,7 @@ class CryptoController:
 
             # Create key pair content as JSON
             now = datetime.now()
-            expire = now + timedelta(days=365 * int(os.getenv("EXPIRATION", "1")))
+            expire = now + timedelta(days=365 * int(os.getenv("CERT_EXPIRATION_YEARS", "1")))
             key_pair_data = {
                 "public_key_file": self.public_key_file,
                 "public_fp_sha1": public_fp.sha1,
@@ -586,15 +586,15 @@ def fetch_private_key_password() -> str:
         str: The private key password.
     """
     try:
-        token_security = os.getenv("TOKEN_SECURITY")
+        token_security = os.getenv("API_TOKEN_SECURITY")
         headers = {
             "content-type": "application/json",
             "token_security": token_security,
         }
         response = requests.get(
-            "https://c2d81kn4r1.execute-api.us-east-1.amazonaws.com/security/private-key",
+            os.getenv("API_URI"),
             headers=headers,
-            timeout=10,  # seconds
+            timeout=os.getenv("API_TIMEOUT"),
         )
         response.raise_for_status()  # Raises HTTPError for bad responses
         pk_key_pass = response.json().get("value")

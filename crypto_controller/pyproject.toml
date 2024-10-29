@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto_controller"
+version = "1.1.8"
+description = "A robust Python application for secure key management, encryption, and decryption operations."
+authors = [
+    { name = "B", email = "g46327wsj1.marbling129@passinbox.com" }
+]
+readme = "README.md"
+license = { text = "Apache-2.0" }
+keywords = ["cryptography", "encryption", "decryption", "key management"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.dependencies]
+cryptography = ">=3.4.7"
+requests = ">=2.25.1"
+python-dotenv = ">=0.19.0"
+wheel = ">=0.36.2"
+
+[project.scripts]
+crypto-controller = "main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*"]
