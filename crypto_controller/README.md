@@ -36,7 +36,7 @@ CryptoController is a robust Python application designed for secure key manageme
 1. **Clone the Repository:**
 
    ```bash
-   cd scripts/crypto_controller
+   cd crypto_controller
    ```
 
 2. **Create a Virtual Environment**
@@ -141,7 +141,7 @@ Renews existing keys by cleaning the vault and generating new keys.
 python main.py renew --log-level DEBUG
 ```
 
-## 🔒 Encrypting Data
+### 🔒 Encrypting Data
 
 Encrypts plain text using hybrid encryption.
 
