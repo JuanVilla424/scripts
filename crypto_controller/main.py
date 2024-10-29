@@ -594,7 +594,7 @@ def fetch_private_key_password() -> str:
         response = requests.get(
             os.getenv("API_URI"),
             headers=headers,
-            timeout=os.getenv("API_TIMEOUT"),
+            timeout=int(os.getenv("API_TIMEOUT")),
         )
         response.raise_for_status()  # Raises HTTPError for bad responses
         pk_key_pass = response.json().get("value")
