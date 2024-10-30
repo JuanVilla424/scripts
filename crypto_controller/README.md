@@ -116,7 +116,7 @@ ALERT_RECIPIENT=recipient@example.com
   - API_URI: Password API mode base URI.
   - API_TOKEN_SECURITY: Password API mode token security.
   - API_TIMEOUT: Password API mode timeout.
-  - KP*PASSWORD: Password plain mode, used it or API* vars.
+  - KP_PASSWORD: Password plain mode, used it or API vars.
   - CERT_EXPIRATION_YEARS: Number of years before key expiration.
   - SMTP_SERVER: SMTP server address for sending emails.
   - SMTP_PORT: SMTP server port.
