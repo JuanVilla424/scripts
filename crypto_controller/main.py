@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 import logging
-from enum import verify
+import time
 from logging.handlers import RotatingFileHandler
 import shutil
 import hashlib
@@ -13,6 +13,7 @@ import requests
 import warnings
 import smtplib
 from email.mime.text import MIMEText
+import json  # Added import for JSON handling
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -27,17 +28,10 @@ warnings.filterwarnings("ignore")
 # Load environment variables from .env file
 load_dotenv()
 
-# Resource usage thresholds
-CPU_USAGE_THRESHOLD = float(os.getenv("CPU_USAGE_THRESHOLD", "70.0"))
-MEMORY_USAGE_THRESHOLD = float(os.getenv("MEMORY_USAGE_THRESHOLD", "395.0"))
-DISK_SPACE_THRESHOLD = float(os.getenv("DISK_SPACE_THRESHOLD", "75.0"))
+CERT_EXPIRATION_YEARS = os.getenv("CERT_EXPIRATION_YEARS", "1")
 
 # Verify that required environment variables are set
-REQUIRED_ENV_VARS = [
-    CPU_USAGE_THRESHOLD,
-    MEMORY_USAGE_THRESHOLD,
-    DISK_SPACE_THRESHOLD,
-]
+REQUIRED_ENV_VARS = [CERT_EXPIRATION_YEARS]
 
 if not all(REQUIRED_ENV_VARS):
     raise EnvironmentError("One or more required environment variables are missing.")
@@ -213,7 +207,7 @@ class CryptoController:
 
             # Concatenate with colon as delimiter
             encrypted_data = f"{encrypted_aes_key_b64}:{iv_b64}:{ciphertext_b64}"
-            logger.info("Hybrid encryption successful.")
+            logger.debug("Hybrid encryption successful.")
             return encrypted_data
 
         except Exception as error:
@@ -263,12 +257,13 @@ class CryptoController:
             decrypted_text = decryptor.update(ciphertext) + decryptor.finalize()
 
             decrypted_str = decrypted_text.decode("utf-8")
-            logger.info("Hybrid decryption successful.")
+            logger.debug("Hybrid decryption successful.")
             return decrypted_str
 
         except Exception as error:
             logger.error(f"Hybrid decryption failed: {error}", exc_info=True)
-            raise
+            logger.fatal("Can't decrypt encrypted data.")
+            sys.exit(1)
 
     def encrypt(self, plain_text: str) -> str:
         """
@@ -310,25 +305,105 @@ class CryptoController:
             with open(self.key_pair_file, "r") as kp_file:
                 encrypted_kp = kp_file.read()
             decrypted_kp = self.decrypt(encrypted_kp)
-            kp_content = decrypted_kp.split(
-                ":"
-            )  # Assuming kp_content was concatenated without JSON
+            kp_data = json.loads(decrypted_kp)
 
-            # Assuming kp_content has specific order: public_key_name:public_key_footprint:private_key_name:private_key_footprint:key_pair_name:no_before_date:no_after_date
-            # TODO: Adjust this according to your actual key_pair_file format
+            # Required fields in kp_data
+            required_fields = {
+                "public_key_file",
+                "public_fp_sha1",
+                "public_fp_sha256",
+                "private_key_file",
+                "private_fp_sha1",
+                "private_fp_sha256",
+                "key_pair_file",
+                "creation_date",
+                "expiration_date",
+            }
 
-            # For simplicity, we'll skip detailed verification here
-            logger.info("Key verification successful.")
+            missing_fields = required_fields - kp_data.keys()
+            if missing_fields:
+                logger.error(f"Missing fields in key pair data: {missing_fields}")
+                return False
+
+            # Check if key files exist
+            if not os.path.exists(kp_data["public_key_file"]):
+                logger.error(f"Public key file does not exist: {kp_data['public_key_file']}")
+                return False
+
+            if not os.path.exists(kp_data["private_key_file"]):
+                logger.error(f"Private key file does not exist: {kp_data['private_key_file']}")
+                return False
+
+            # Verify public key footprint
+            current_public_fp = get_key_footprint(kp_data["public_key_file"], "public")
+            if (
+                current_public_fp.sha1 != kp_data["public_fp_sha1"]
+                or current_public_fp.sha256 != kp_data["public_fp_sha256"]
+            ):
+                logger.error("Public key fingerprints do not match.")
+                return False
+
+            # Verify private key footprint
+            current_private_fp = get_key_footprint(kp_data["private_key_file"], "private")
+            if (
+                current_private_fp.sha1 != kp_data["private_fp_sha1"]
+                or current_private_fp.sha256 != kp_data["private_fp_sha256"]
+            ):
+                logger.error("Private key fingerprints do not match.")
+                return False
+
+            # Optionally, check if the key pair file path matches
+            if kp_data["key_pair_file"] != self.key_pair_file:
+                logger.error("Key pair file path does not match the expected location.")
+                return False
+
+            # Optionally, check if the current date is before expiration
+            expiration_date = datetime.strptime(kp_data["expiration_date"], "%d%m%Y%H%M%S")
+            if datetime.now() > expiration_date:
+                logger.error("The key pair has expired.")
+                return False
+
+            logger.debug("Key verification successful.")
             return True
         except Exception as error:
             logger.error(f"Verification failed: {error}", exc_info=True)
             return False
 
+    def get_expiration(self) -> str:
+        """
+        Retrieves the expiration date of the key pair.
+
+        Returns:
+            str: Expiration date in ISO format, or 'Unknown' if not available.
+        """
+        try:
+            with open(self.key_pair_file, "r") as kp_file:
+                encrypted_kp = kp_file.read()
+            decrypted_kp = self.decrypt(encrypted_kp)
+            logger.debug(f"Decrypted key pair content: {decrypted_kp}")
+
+            # Parse JSON
+            kp_data = json.loads(decrypted_kp)
+            logger.debug(f"Key pair data: {kp_data}")
+
+            expiration_str = kp_data.get("expiration_date")
+            if not expiration_str:
+                raise ValueError("Expiration date not found in key pair data.")
+
+            # Parse the date string
+            expiration_date = datetime.strptime(expiration_str, "%d%m%Y%H%M%S")
+            # Return the date in ISO format
+            logger.debug(f"Expiration date retrieved successfully: {expiration_date.isoformat()}")
+            return expiration_date.isoformat()
+        except Exception as error:
+            logger.error(f"Failed to get expiration date: {error}", exc_info=True)
+            return "Unknown"
+
     def create_keys(self) -> None:
         """
         Generates a new RSA key pair and stores them securely.
         """
-        if verify():
+        if self.verify():
             logger.info("Keys validation successful, nothing to do.")
             return
         try:
@@ -357,10 +432,22 @@ class CryptoController:
             public_fp = get_key_footprint(self.public_key_file, "public")
             private_fp = get_key_footprint(self.private_key_file, "private")
 
-            # Create key pair content as concatenated string
+            # Create key pair content as JSON
             now = datetime.now()
-            expire = now + timedelta(days=365 * 6)  # Expiration in 6 years
-            key_pair_content = f"{self.public_key_file}:{public_fp.sha1},{public_fp.sha256}:{self.private_key_file}:{private_fp.sha1},{private_fp.sha256}:{self.key_pair_file}:{now.strftime('%d%m%Y%H%M%S')}:{expire.strftime('%d%m%Y%H%M%S')}"
+            expire = now + timedelta(days=365 * int(CERT_EXPIRATION_YEARS))
+            key_pair_data = {
+                "public_key_file": self.public_key_file,
+                "public_fp_sha1": public_fp.sha1,
+                "public_fp_sha256": public_fp.sha256,
+                "private_key_file": self.private_key_file,
+                "private_fp_sha1": private_fp.sha1,
+                "private_fp_sha256": private_fp.sha256,
+                "key_pair_file": self.key_pair_file,
+                "creation_date": now.strftime("%d%m%Y%H%M%S"),
+                "expiration_date": expire.strftime("%d%m%Y%H%M%S"),
+            }
+
+            key_pair_content = json.dumps(key_pair_data)
             encrypted_kp = self.encrypt(key_pair_content)  # Uses hybrid encryption
 
             with open(self.key_pair_file, "w") as kp_file:
@@ -436,10 +523,14 @@ class CryptoController:
                 "Private Key Exists": os.path.exists(self.private_key_file),
                 "Key Pair File Exists": os.path.exists(self.key_pair_file),
                 "Key Verification": self.verify(),
+                "Expiration": self.get_expiration(),
             }
             print("CryptoController Status:")
             for key, value in status.items():
-                print(f" - {key}: {'Yes' if value else 'No'}")
+                if isinstance(value, bool):
+                    print(f" - {key}: {'Yes' if value else 'No'}")
+                else:
+                    print(f" - {key}: {value}")
         except Exception as error:
             logger.error(f"Failed to retrieve status: {error}", exc_info=True)
             print("Failed to retrieve status. Check logs for more details.")
@@ -490,25 +581,37 @@ def fetch_private_key_password() -> str:
         str: The private key password.
     """
     try:
-        token_security = os.getenv("TOKEN_SECURITY")
+        token_security = os.getenv("API_TOKEN_SECURITY")
         headers = {
             "content-type": "application/json",
             "token_security": token_security,
         }
         response = requests.get(
-            "https://c2d81kn4r1.execute-api.us-east-1.amazonaws.com/security/private-key",
+            os.getenv("API_URI"),
             headers=headers,
-            timeout=10,  # seconds
+            timeout=int(os.getenv("API_TIMEOUT")),
         )
         response.raise_for_status()  # Raises HTTPError for bad responses
         pk_key_pass = response.json().get("value")
-        if not pk_key_pass:
-            logger.error("The key 'value' was not found in the response.")
-            sys.exit(1)
         return pk_key_pass
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching private key password: {e}", exc_info=True)
-        sys.exit(1)
+    except requests.exceptions.RequestException as e_requests_exception_fetch_password:
+        logger.error(
+            f"Error fetching private key password from api: {e_requests_exception_fetch_password}",
+            exc_info=True,
+        )
+        try:
+            logger.debug("Trying using KP_PASSWORD value...")
+            pk_key_pass = os.getenv("KP_PASSWORD")
+            return pk_key_pass
+        except KeyError as e_key_error_fetch_password:
+            logger.error(
+                f"The key was not found in the environment: {e_key_error_fetch_password}",
+                exc_info=True,
+            )
+            logger.error(
+                "STARTING USING DEFAULT PASSWORD WHICH IS NOT RECOMMENDED, CLEAN AND SET THIS ONE TO .env FILE AS KP_PASSWORD..."
+            )
+            return "password123456789099ab5e7b9add0dc4e5"
 
 
 def send_expiration_alert(expiration_date: datetime) -> None:
@@ -551,6 +654,8 @@ def main():
     """
     Main function to execute the Crypto Controller operations.
     """
+    start_time = time.time()
+
     args = parse_arguments()
     configure_logger(args.log_level)
 
@@ -610,10 +715,12 @@ def main():
 
         elif operation == "status":
             crypto.get_status()
-
     except Exception as error:
         logger.error(f"Operation '{args.operation}' failed: {error}", exc_info=True)
-        sys.exit(1)
+    finally:
+        end_time = time.time()
+        time_elapsed = end_time - start_time
+        logger.debug(f"End. Took: {time_elapsed:.4f} seconds")
 
 
 if __name__ == "__main__":
