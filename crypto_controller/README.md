@@ -181,23 +181,24 @@ python main.py status --log-level DEBUG
 
 Ensure all required environment variables are set in the .env file:
 
-    Resource Thresholds:
-        CPU_USAGE_THRESHOLD
-        MEMORY_USAGE_THRESHOLD
-        DISK_SPACE_THRESHOLD
+    Password KP Settings:
+        Password Key Pair (API-Token Mode):
+            API_URI: Password API mode base URI.
+            API_TOKEN_SECURITY: Password API mode token security.
+            API_TIMEOUT: Password API mode timeout.
 
-    Key Management:
-        EXPIRATION: Number of years before key expiration.
+        Pasword Key Pair (Local Mode):
+            KP_PASSWORD: Password plain mode, used it or API vars.
 
-    Security:
-        TOKEN_SECURITY: Token for secure API access.
+    Certificate Vault Settings:
+        CERT_EXPIRATION_YEARS: Number of years before key expiration.
 
-    Email Notifications:
-        SMTP_SERVER
-        SMTP_PORT
-        SMTP_USER
-        SMTP_PASSWORD
-        ALERT_RECIPIENT
+    Expiration Notifications Settings:
+        SMTP_SERVER: SMTP server address for sending emails.
+        SMTP_PORT: SMTP server port.
+        SMTP_USER: SMTP server username.
+        SMTP_PASSWORD: SMTP server password.
+        ALERT_RECIPIENT: Email address to receive expiration alerts.
 
 ## 📊 Logging
 
