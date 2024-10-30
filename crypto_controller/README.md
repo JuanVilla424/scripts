@@ -92,11 +92,19 @@ CryptoController is a robust Python application designed for secure key manageme
 Create a .env file in the project root directory and populate it with the following variables:
 
 ```bash
-CPU_USAGE_THRESHOLD=70.0
-MEMORY_USAGE_THRESHOLD=395.0
-DISK_SPACE_THRESHOLD=75.0
-EXPIRATION=1
-TOKEN_SECURITY=your_secure_token_here
+# Password KP Settings
+## Password Key Pair (API-Token Mode)
+# API_URI="https://tu.dominio.com/private-key" <- Uncomment and comment KP_PASSWORD
+# API_TOKEN_SECURITY="api_token" <- Uncomment and comment KP_PASSWORD
+# API_TIMEOUT=12 <- Uncomment and comment KP_PASSWORD
+### OR
+## Password Key Pair (Local Mode)
+KP_PASSWORD="<28 (Chars)>"
+
+# Certificate Vault Settings
+CERT_EXPIRATION_YEARS=6
+
+# Expiration Notifications Settings
 SMTP_SERVER=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your_email@example.com
@@ -105,11 +113,11 @@ ALERT_RECIPIENT=recipient@example.com
 ```
 
 - Descriptions:
-  - CPU_USAGE_THRESHOLD: CPU usage percentage threshold.
-  - MEMORY_USAGE_THRESHOLD: Memory usage threshold in MB.
-  - DISK_SPACE_THRESHOLD: Disk space usage percentage threshold.
-  - EXPIRATION: Number of years before key expiration.
-  - TOKEN_SECURITY: Token for fetching the private key password securely.
+  - API_URI: Password API mode base URI.
+  - API_TOKEN_SECURITY: Password API mode token security.
+  - API_TIMEOUT: Password API mode timeout.
+  - KP*PASSWORD: Password plain mode, used it or API* vars.
+  - CERT_EXPIRATION_YEARS: Number of years before key expiration.
   - SMTP_SERVER: SMTP server address for sending emails.
   - SMTP_PORT: SMTP server port.
   - SMTP_USER: SMTP server username.

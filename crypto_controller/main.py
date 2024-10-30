@@ -27,17 +27,10 @@ warnings.filterwarnings("ignore")
 # Load environment variables from .env file
 load_dotenv()
 
-# Resource usage thresholds
-CPU_USAGE_THRESHOLD = float(os.getenv("CPU_USAGE_THRESHOLD", "70.0"))
-MEMORY_USAGE_THRESHOLD = float(os.getenv("MEMORY_USAGE_THRESHOLD", "395.0"))
-DISK_SPACE_THRESHOLD = float(os.getenv("DISK_SPACE_THRESHOLD", "75.0"))
+CERT_EXPIRATION_YEARS = os.getenv("CERT_EXPIRATION_YEARS", "1")
 
 # Verify that required environment variables are set
-REQUIRED_ENV_VARS = [
-    CPU_USAGE_THRESHOLD,
-    MEMORY_USAGE_THRESHOLD,
-    DISK_SPACE_THRESHOLD,
-]
+REQUIRED_ENV_VARS = [CERT_EXPIRATION_YEARS]
 
 if not all(REQUIRED_ENV_VARS):
     raise EnvironmentError("One or more required environment variables are missing.")
@@ -213,7 +206,7 @@ class CryptoController:
 
             # Concatenate with colon as delimiter
             encrypted_data = f"{encrypted_aes_key_b64}:{iv_b64}:{ciphertext_b64}"
-            logger.info("Hybrid encryption successful.")
+            logger.debug("Hybrid encryption successful.")
             return encrypted_data
 
         except Exception as error:
@@ -263,12 +256,13 @@ class CryptoController:
             decrypted_text = decryptor.update(ciphertext) + decryptor.finalize()
 
             decrypted_str = decrypted_text.decode("utf-8")
-            logger.info("Hybrid decryption successful.")
+            logger.debug("Hybrid decryption successful.")
             return decrypted_str
 
         except Exception as error:
             logger.error(f"Hybrid decryption failed: {error}", exc_info=True)
-            raise
+            logger.fatal("Can't decrypt encrypted data.")
+            sys.exit(1)
 
     def encrypt(self, plain_text: str) -> str:
         """
@@ -368,7 +362,7 @@ class CryptoController:
                 logger.error("The key pair has expired.")
                 return False
 
-            logger.info("Key verification successful.")
+            logger.debug("Key verification successful.")
             return True
         except Exception as error:
             logger.error(f"Verification failed: {error}", exc_info=True)
@@ -439,7 +433,7 @@ class CryptoController:
 
             # Create key pair content as JSON
             now = datetime.now()
-            expire = now + timedelta(days=365 * int(os.getenv("CERT_EXPIRATION_YEARS", "1")))
+            expire = now + timedelta(days=365 * int(CERT_EXPIRATION_YEARS))
             key_pair_data = {
                 "public_key_file": self.public_key_file,
                 "public_fp_sha1": public_fp.sha1,
@@ -598,13 +592,25 @@ def fetch_private_key_password() -> str:
         )
         response.raise_for_status()  # Raises HTTPError for bad responses
         pk_key_pass = response.json().get("value")
-        if not pk_key_pass:
-            logger.error("The key 'value' was not found in the response.")
-            sys.exit(1)
         return pk_key_pass
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching private key password: {e}", exc_info=True)
-        sys.exit(1)
+    except requests.exceptions.RequestException as e_requests_exception_fetch_password:
+        logger.error(
+            f"Error fetching private key password from api: {e_requests_exception_fetch_password}",
+            exc_info=True,
+        )
+        try:
+            logger.debug("Trying using KP_PASSWORD value...")
+            pk_key_pass = os.getenv("KP_PASSWORD")
+            return pk_key_pass
+        except KeyError as e_key_error_fetch_password:
+            logger.error(
+                f"The key was not found in the environment: {e_key_error_fetch_password}",
+                exc_info=True,
+            )
+            logger.error(
+                "STARTING USING DEFAULT PASSWORD WHICH IS NOT RECOMMENDED, CLEAN AND SET THIS ONE TO .env FILE AS KP_PASSWORD..."
+            )
+            return "password123456789099ab5e7b9add0dc4e5"
 
 
 def send_expiration_alert(expiration_date: datetime) -> None:
