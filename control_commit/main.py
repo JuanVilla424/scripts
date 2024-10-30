@@ -94,7 +94,8 @@ def configure_logger(log_level: str) -> None:
                 )
                 self.stream.write(msg + self.terminator)
                 self.flush()
-            except Exception:
+            except Exception as e_handle_emit:
+                logger.debug(f"SafeStreamHandler error: {e_handle_emit}")
                 self.handleError(record)
 
     safe_console_handler = SafeStreamHandler()
