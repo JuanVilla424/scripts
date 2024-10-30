@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import logging
+import time
 from logging.handlers import RotatingFileHandler
 import shutil
 import hashlib
@@ -653,6 +654,8 @@ def main():
     """
     Main function to execute the Crypto Controller operations.
     """
+    start_time = time.time()
+
     args = parse_arguments()
     configure_logger(args.log_level)
 
@@ -712,10 +715,12 @@ def main():
 
         elif operation == "status":
             crypto.get_status()
-
     except Exception as error:
         logger.error(f"Operation '{args.operation}' failed: {error}", exc_info=True)
-        sys.exit(1)
+    finally:
+        end_time = time.time()
+        time_elapsed = end_time - start_time
+        logger.debug(f"End. Took: {time_elapsed:.4f} seconds")
 
 
 if __name__ == "__main__":
