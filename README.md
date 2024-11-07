@@ -1,9 +1,10 @@
 # 🗄️ Scripts Repository
 
 ![CI/CD](https://img.shields.io/badge/CI/CD-Pipeline-blue)
-![Status](https://img.shields.io/badge/Status-Stable-green.svg)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
-![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
+![Status](https://img.shields.io/badge/Status-Stable-green.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.md)
 
 This repository contains a collection of base Python scripts that are invoked by the CI/CD processes of other repositories, especially the template repository. These scripts are used for formatting, checking files, version control, and updating the year in file headers or documentation.
 
