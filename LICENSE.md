@@ -617,9 +617,9 @@ modification follow.
     Program, unless a warranty or assumption of liability accompanies a
     copy of the Program in return for a fee.
 
-<h1><p style="text-align: center;">END OF TERMS AND CONDITIONS</p></h1>
+<h2><p style="text-align: center;">END OF TERMS AND CONDITIONS</p></h2>
 
-<h2><p style="text-align: center;">How to Apply These Terms to Your New Programs</p></h2>
+<h1><p style="text-align: center;">How to Apply These Terms to Your New Programs</p></h1>
 
 If you develop a new program, and you want it to be of the greatest
 possible use to the public, the best way to achieve this is to make it
