@@ -3,6 +3,7 @@
 ![CI/CD](https://img.shields.io/badge/CI/CD-Pipeline-blue)
 ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
+![Build Status](https://github.com/JuanVilla424/scripts/actions/workflows/ci.yml/badge.svg?branch=main)
 ![Status](https://img.shields.io/badge/Status-Stable-green.svg)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.md)
 
