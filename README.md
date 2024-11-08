@@ -1,9 +1,11 @@
 # 🗄️ Scripts Repository
 
 ![CI/CD](https://img.shields.io/badge/CI/CD-Pipeline-blue)
-![Status](https://img.shields.io/badge/Status-Stable-green.svg)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)
-![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
+![Build Status](https://github.com/JuanVilla424/scripts/actions/workflows/ci.yml/badge.svg?branch=main)
+![Status](https://img.shields.io/badge/Status-Stable-green.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.md)
 
 This repository contains a collection of base Python scripts that are invoked by the CI/CD processes of other repositories, especially the template repository. These scripts are used for formatting, checking files, version control, and updating the year in file headers or documentation.
 
@@ -145,4 +147,4 @@ For any inquiries or support, please open an issue or contact [r6ty5r296it6tl4eg
 
 ## 📜 License
 
-2024 - This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license. For more details, please refer to the [LICENSE](LICENSE) file included in this repository.
+2024 - This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license. For more details, please refer to the [LICENSE](LICENSE.md) file included in this repository.
