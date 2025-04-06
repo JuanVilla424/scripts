@@ -9,7 +9,7 @@ We provide security updates for the following versions of our project:
 | Version | Status      | Secure |
 | ------- | ----------- | ------ |
 | 1.0.0   | End-of-life | No     |
-| 1.0.1   | Supported   | Yes    |
+| 1.1.13  | Supported   | Yes    |
 
 ## 🛡️ Security Practices
 
