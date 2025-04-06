@@ -11,12 +11,12 @@ repos:
         types: [yaml]
         files: \.(yaml)$
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.1.0
     hooks:
       - id: black
         language_version: python3
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.3.1
+    rev: v3.3.6
     hooks:
       - id: pylint
         name: pylint
