@@ -9,7 +9,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
-setuptools = "^78.1.0"
+setuptools = "^79.0.0"
 idna = "^3.0"
 certifi = "^2025.1.31"
 bump2version = "^1.0.0"
