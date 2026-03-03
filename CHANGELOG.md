@@ -1,3 +1,13 @@
+## [1.1.17] - 2026-03-03
+
+### Bug Fixes
+
+- **core**: use access token for tag push to trigger release workflow (`patch candidate`)
+
+### Documentation
+
+- **core**: update changelog
+
 ## [1.1.16] - 2026-03-03
 
 ### Features
