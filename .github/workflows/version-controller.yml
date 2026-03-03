@@ -17,12 +17,12 @@ jobs:
     steps:
       - name: Checkout Repository
         id: checkout_repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up Python
         id: setup_python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install Dependencies
@@ -61,18 +61,28 @@ jobs:
         run: |
           ls -la
           git submodule add --force -b ${{ steps.determine_branch.outputs.current_branch }} https://github.com/JuanVilla424/scripts.git
-#      - name: Run Changelog Generator
-#        id: run_changelog
-#        run: |
-#          python scripts/generate_changelog/main.py
+      - name: Run Changelog Generator
+        id: run_changelog
+        run: |
+          python scripts/generate_changelog/main.py
+      - name: Commit Changelog Updates
+        id: commit_changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md || true
+          git diff --cached --quiet || git commit -m "docs(core): update changelog"
       - name: Check for Forbidden Character
         id: check_arrow
         run: |
-          if [[ "${{ steps.get_commit.outputs.commit_message }}" == *"→"* && "${{ steps.get_commit.outputs.commit_message }}" == *"Bump version:"* ]]; then
+          COMMIT_MSG="${COMMIT_MESSAGE}"
+          if [[ "$COMMIT_MSG" == *"→"* && "$COMMIT_MSG" == *"Bump version:"* ]]; then
             echo "contains_arrow=true" >> $GITHUB_OUTPUT
           else
             echo "contains_arrow=false" >> $GITHUB_OUTPUT
           fi
+        env:
+          COMMIT_MESSAGE: ${{ steps.get_commit.outputs.commit_message }}
       - name: Create Tag
         id: create_tag
         if: steps.check_arrow.outputs.contains_arrow == 'true'
@@ -98,7 +108,7 @@ jobs:
       - name: Create Pull Request
         id: create_pull_request
         if: steps.check_arrow.outputs.contains_arrow == 'true' && github.ref != 'refs/heads/main'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
