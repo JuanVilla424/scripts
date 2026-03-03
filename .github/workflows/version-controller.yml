@@ -99,7 +99,7 @@ jobs:
         run: |
           git push origin "${{ steps.create_tag.outputs.tag_name }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
       - name: Ensure on Current Branch
         id: ensure_branch
         if: steps.check_arrow.outputs.contains_arrow == 'true'
@@ -148,4 +148,4 @@ jobs:
           git tag "$TAG_NAME"
           git push origin "$TAG_NAME"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}

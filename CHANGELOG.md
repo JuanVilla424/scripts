@@ -1,3 +1,40 @@
+## [1.1.16] - 2026-03-03
+
+### Features
+
+- **core**: add inline release notes and update cicd workflows (`patch candidate`)
+
+### Documentation
+
+- **core**: update changelog
+
+## [1.1.15] - 2026-03-02
+
+### Bug Fixes
+
+- **core**: remove unreleased section to prevent hook conflicts during push (`patch candidate`)
+- **core**: fix changelog generator incremental update, noise filter, tag dates and optional keywords (`patch candidate`)
+- **deps**: update pylint requirement from ^3.3.0 to ^4.0.5 (#96)
+- **deps**: update cryptography requirement from ^45.0.4 to ^46.0.5 (#95)
+- **deps**: update setuptools requirement from ^80.9.0 to ^82.0.0 (#94)
+- **deps**: update black requirement from ^25.1.0 to ^26.1.0 (#92)
+- **deps**: update certifi requirement from ^2025.1.31 to ^2026.1.4 (#91)
+- **deps**: update pylint requirement from ^3.3.0 to ^4.0.5
+- **deps**: update cryptography requirement from ^45.0.4 to ^46.0.5
+- **deps**: update setuptools requirement from ^80.9.0 to ^82.0.0
+- **deps**: update black requirement from ^25.1.0 to ^26.1.0
+- **deps**: update certifi requirement from ^2025.1.31 to ^2026.1.4
+- **deps**: update cryptography requirement from ^44.0.0 to ^45.0.4 (#78)
+- **deps**: update requests requirement from ~=2.32.3 to ~=2.32.4 (#77)
+- **deps**: update setuptools requirement from ^78.1.0 to ^80.9.0 (#76)
+- **deps**: update cryptography requirement from ^44.0.0 to ^45.0.4
+- **deps**: update requests requirement from ~=2.32.3 to ~=2.32.4
+- **deps**: update setuptools requirement from ^78.1.0 to ^80.9.0
+
+### Chores
+
+- **core**: restrict file-modifying hooks to pre-commit stage only (`patch candidate`)
+
 ## [1.1.14] - 2025-04-06
 
 ### Bug Fixes
