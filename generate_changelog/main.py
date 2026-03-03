@@ -330,23 +330,9 @@ def get_all_commits(tags: List[str]) -> Dict[str, List[str]]:
     """
     commits_dict = OrderedDict()
 
-    # Handle commits after the latest tag (Unreleased)
-    if tags:
-        latest_tag = tags[-1]  # Last tag is the latest
-        try:
-            commit_range = f"{latest_tag}..HEAD"
-            logger.debug(f"Retrieving commits after the latest tag: {latest_tag}")
-            unreleased_commits = (
-                subprocess.check_output(["git", "log", commit_range, "--pretty=format:%s"])
-                .decode()
-                .split("\n")
-            )
-            unreleased_commits = [commit.strip() for commit in unreleased_commits if commit.strip()]
-            if unreleased_commits:
-                commits_dict["Unreleased"] = unreleased_commits
-                logger.info(f"Number of unreleased commits: {len(unreleased_commits)}")
-        except subprocess.CalledProcessError as error:
-            logger.error(f"Error retrieving unreleased commits: {error}")
+    # Only include tagged versions in the changelog.
+    # Unreleased commits are excluded to keep the changelog stable
+    # and avoid conflicts with pre-push hooks that amend commits.
 
     # Process sorted_tags in ascending order
     previous_tag = None
@@ -454,12 +440,9 @@ def generate_changelog_entry(
     Returns:
         str: The formatted changelog entry.
     """
-    if version == "Unreleased":
-        entry = f"## [{version}]\n\n"
-    else:
-        if not date:
-            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        entry = f"## [{version}] - {date}\n\n"
+    if not date:
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    entry = f"## [{version}] - {date}\n\n"
     logger.debug(f"Generating changelog entry for version {version}.")
 
     for section, items in changelog.items():
