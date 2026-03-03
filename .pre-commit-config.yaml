@@ -85,14 +85,17 @@ repos:
         always_run: true
         pass_filenames: false
         language: system
+        stages: [pre-commit]
       - id: generate-changelog
         name: generate-changelog
         entry: python generate_changelog/main.py --log-level=INFO
         always_run: true
         pass_filenames: false
         language: system
+        stages: [pre-commit]
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         files: \.(markdown|md)$
+        stages: [pre-commit]
