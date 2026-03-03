@@ -27,11 +27,21 @@ CHANGELOG_PATH = "CHANGELOG.md"
 
 # Define the commit message regex pattern
 # Example: feat(authentication): add OAuth2 support [minor candidate]
+# The versioning keyword is now optional to match commits without it
 COMMIT_REGEX = re.compile(
     r"^(?P<type>feat|fix|docs|style|refactor|perf|test|chore)"
-    r"(?:\((?P<scope>[^)]+)\))?:\s+(?P<description>.+?)\s+\[(?P<versioning_keyword>minor candidate|major candidate|patch candidate)]$",
+    r"(?:\((?P<scope>[^)]+)\))?:\s+(?P<description>.+?)"
+    r"(?:\s+\[(?P<versioning_keyword>minor candidate|major candidate|patch candidate)])?$",
     re.IGNORECASE,
 )
+
+# Patterns to filter out noise commits from changelog
+NOISE_PATTERNS = [
+    re.compile(r"Bump version:", re.IGNORECASE),
+    re.compile(r"^Merge branch", re.IGNORECASE),
+    re.compile(r"^Merge pull request", re.IGNORECASE),
+    re.compile(r"from \w+ - from \w+", re.IGNORECASE),
+]
 
 # Mapping of commit types to changelog sections
 TYPE_MAPPING = {
@@ -163,6 +173,47 @@ def compare_versions(v1: str, v2: str) -> int:
         return -1
 
     return 0
+
+
+def is_noise_commit(commit: str) -> bool:
+    """
+    Checks if a commit message is noise that should be filtered out.
+
+    Args:
+        commit (str): The commit message.
+
+    Returns:
+        bool: True if the commit should be filtered out.
+    """
+    for pattern in NOISE_PATTERNS:
+        if pattern.search(commit):
+            return True
+    return False
+
+
+def get_tag_date(tag: str) -> str:
+    """
+    Retrieves the date of a Git tag.
+
+    Args:
+        tag (str): The Git tag name.
+
+    Returns:
+        str: The date in YYYY-MM-DD format.
+    """
+    try:
+        date_str = (
+            subprocess.check_output(
+                ["git", "log", "-1", "--format=%ai", tag],
+                encoding="utf-8",
+            )
+            .strip()
+            .split(" ")[0]
+        )
+        return date_str
+    except subprocess.CalledProcessError:
+        logger.warning(f"Could not get date for tag {tag}, using today's date.")
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def get_sorted_tags() -> List[str]:
@@ -311,6 +362,23 @@ def get_all_commits(tags: List[str]) -> Dict[str, List[str]]:
     return commits_dict
 
 
+def get_tag_dates(tags: List[str]) -> Dict[str, str]:
+    """
+    Retrieves dates for all tags.
+
+    Args:
+        tags (List[str]): A list of Git tags.
+
+    Returns:
+        Dict[str, str]: A mapping of version (without 'v') to date string.
+    """
+    dates = {}
+    for tag in tags:
+        dates[tag.lstrip("v")] = get_tag_date(tag)
+    dates["Unreleased"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return dates
+
+
 def parse_commits(commits: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
     """
     Parses commit messages and categorizes them based on type.
@@ -325,27 +393,41 @@ def parse_commits(commits: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
     non_conforming_commits: List[str] = []
 
     for commit in commits:
-        match = COMMIT_REGEX.match(commit)
+        # Skip noise commits
+        if is_noise_commit(commit):
+            logger.debug(f"Skipping noise commit: {commit}")
+            continue
+
+        # Strip leading emoji + space if present (e.g. "✨ feat(core): ...")
+        clean_commit = re.sub(
+            r"^[\U0001f300-\U0001faff\u2600-\u27bf\u2702-\u27b0♻️⚡️]\s*", "", commit
+        )
+
+        match = COMMIT_REGEX.match(clean_commit)
         if match:
             commit_type = match.group("type").lower()
             scope = match.group("scope")
             description = match.group("description").strip()
-            versioning_keyword = match.group("versioning_keyword").lower()
+            versioning_keyword = match.group("versioning_keyword")
 
             section = TYPE_MAPPING.get(commit_type)
             if section:
-                if scope:
-                    entry = f"- **{scope}**: {description} (`{versioning_keyword}`)"
+                if versioning_keyword:
+                    keyword_str = f" (`{versioning_keyword.lower()}`)"
                 else:
-                    entry = f"- {description} (`{versioning_keyword}`)"
+                    keyword_str = ""
+                if scope:
+                    entry = f"- **{scope}**: {description}{keyword_str}"
+                else:
+                    entry = f"- {description}{keyword_str}"
                 changelog[section].append(entry)
                 logger.debug(f"Commit categorized under {section}: {entry}")
             else:
-                non_conforming_commits.append(commit)
+                non_conforming_commits.append(clean_commit)
                 logger.debug(f"Commit type '{commit_type}' not recognized.")
         else:
-            non_conforming_commits.append(commit)
-            logger.debug(f"Commit does not match pattern: {commit}")
+            non_conforming_commits.append(clean_commit)
+            logger.debug(f"Commit does not match pattern: {clean_commit}")
 
     # Remove empty sections
     changelog = {k: v for k, v in changelog.items() if v}
@@ -355,7 +437,10 @@ def parse_commits(commits: List[str]) -> Tuple[Dict[str, List[str]], List[str]]:
 
 
 def generate_changelog_entry(
-    version: str, changelog: Dict[str, List[str]], non_conforming: List[str]
+    version: str,
+    changelog: Dict[str, List[str]],
+    non_conforming: List[str],
+    date: str = "",
 ) -> str:
     """
     Generates a changelog entry for a specific version.
@@ -364,12 +449,17 @@ def generate_changelog_entry(
         version (str): The version number.
         changelog (Dict[str, List[str]]): The categorized changelog entries.
         non_conforming (List[str]): List of non-conforming commit messages.
+        date (str): The date string in YYYY-MM-DD format.
 
     Returns:
         str: The formatted changelog entry.
     """
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    entry = f"## [{version}] - {date}\n\n"
+    if version == "Unreleased":
+        entry = f"## [{version}]\n\n"
+    else:
+        if not date:
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        entry = f"## [{version}] - {date}\n\n"
     logger.debug(f"Generating changelog entry for version {version}.")
 
     for section, items in changelog.items():
@@ -388,12 +478,13 @@ def generate_changelog_entry(
     return entry
 
 
-def generate_full_changelog(commits_dict: Dict[str, List[str]]) -> str:
+def generate_full_changelog(commits_dict: Dict[str, List[str]], tag_dates: Dict[str, str]) -> str:
     """
     Generates the full changelog content from the commits' dictionary.
 
     Args:
         commits_dict (Dict[str, List[str]]): An OrderedDict with version keys and commit lists.
+        tag_dates (Dict[str, str]): A mapping of version to date string.
 
     Returns:
         str: The full formatted changelog content.
@@ -405,7 +496,8 @@ def generate_full_changelog(commits_dict: Dict[str, List[str]]) -> str:
         if not commits:
             continue
         changelog, non_conforming = parse_commits(commits)
-        changelog_entry = generate_changelog_entry(version, changelog, non_conforming)
+        date = tag_dates.get(version, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        changelog_entry = generate_changelog_entry(version, changelog, non_conforming, date)
         changelog_content += changelog_entry
 
     return changelog_content
@@ -413,10 +505,13 @@ def generate_full_changelog(commits_dict: Dict[str, List[str]]) -> str:
 
 def update_changelog(new_content: str) -> bool:
     """
-    Creates or updates the CHANGELOG.md file by prepending the new content.
+    Creates or overwrites the CHANGELOG.md file with the full generated content.
+
+    The changelog is always regenerated from scratch based on git tags,
+    so we do a full write instead of prepending to avoid duplicates.
 
     Args:
-        new_content (str): The new changelog content to add.
+        new_content (str): The complete changelog content.
 
     Returns:
         bool: True if the changelog was updated, False if no changes were necessary.
@@ -426,7 +521,6 @@ def update_changelog(new_content: str) -> bool:
         if os.path.exists(CHANGELOG_PATH):
             with open(CHANGELOG_PATH, "r", encoding="utf-8") as file:
                 existing_content = file.read()
-
         else:
             existing_content = ""
             logger.warning(f"{CHANGELOG_PATH} not found. A new changelog will be created.")
@@ -434,15 +528,18 @@ def update_changelog(new_content: str) -> bool:
         logger.error(f"Error reading {CHANGELOG_PATH}: {error}")
         return False
 
-    # Compare the new content with the existing content
-    if new_content.strip() == existing_content.strip():
+    # Compare normalized content (ignore whitespace differences from formatters like prettier)
+    def normalize(text: str) -> str:
+        return re.sub(r"\s+", " ", text.strip())
+
+    if normalize(new_content) == normalize(existing_content):
         logger.info("No changes detected in the changelog. No update needed.")
         return False
 
-    # Update the changelog
+    # Write the full changelog (overwrite, not prepend)
     try:
         with open(CHANGELOG_PATH, "w", encoding="utf-8") as file:
-            file.write(new_content + "\n" + existing_content)
+            file.write(new_content)
         logger.info(f"{CHANGELOG_PATH} has been updated.")
         return True
     except Exception as error:
@@ -456,17 +553,14 @@ def main() -> None:
     """
     fetch_tags()
     sorted_tags = get_sorted_tags()
+    tag_dates = get_tag_dates(sorted_tags)
     commits_dict = get_all_commits(sorted_tags)
-    changelog_content = generate_full_changelog(commits_dict)
+    changelog_content = generate_full_changelog(commits_dict, tag_dates)
 
     if not changelog_content:
         logger.info("No commits found to include in the changelog.")
         return
 
-    # TODO: Solve error comparing, for now running manual
-    if os.path.exists(CHANGELOG_PATH):
-        return
-    # Check and update the changelog only if necessary
     updated = update_changelog(changelog_content)
     if not updated:
         logger.info("Changelog was not updated as there are no new changes.")
