@@ -193,6 +193,7 @@
 
 ### Bug Fixes
 
+- **core**: fix changelog generator incremental update, noise filter, tag dates and optional keywords (`patch candidate`)
 - **deps**: update pylint requirement from ^3.3.0 to ^4.0.5 (#96)
 - **deps**: update cryptography requirement from ^45.0.4 to ^46.0.5 (#95)
 - **deps**: update setuptools requirement from ^80.9.0 to ^82.0.0 (#94)
