@@ -61,7 +61,6 @@ Examples:
 ## 🚀 Release Process
 
 1. Development Phase:
-
    - Developers work on features and bug fixes in the `dev` branch.
    - Commit messages should follow the guidelines above to indicate the type of changes.
 
@@ -74,7 +73,6 @@ Examples:
    Final testing and validation occur here before deployment.
 
 4. Release:
-
    - Changes from `prod` are merged into `main`.
    - A release is tagged, and the `CHANGELOG.md` is updated automatically based on commit messages.
 
@@ -89,4 +87,4 @@ Examples:
 
 ## 📜 License
 
-2025 - This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license. For more details, please refer to the [LICENSE](LICENSE) file included in this repository.
+2026 - This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license. For more details, please refer to the [LICENSE](LICENSE) file included in this repository.

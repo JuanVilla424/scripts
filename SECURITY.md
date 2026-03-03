@@ -29,7 +29,6 @@ If you discover a security vulnerability within this project, please follow thes
 1. **Do not create a public issue.** Instead, contact us directly to responsibly disclose the vulnerability.
 
 2. **Email** [r6ty5r296it6tl4eg5m.constant214@passinbox.com](mailto:r6ty5r296it6tl4eg5m.constant214@passinbox.com) with the following information:
-
    - A description of the vulnerability.
    - Steps to reproduce the issue.
    - Any potential impact or severity.
@@ -47,4 +46,4 @@ Thank you for helping us keep this project secure!
 
 ## 📜 License
 
-2025 - This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license. For more details, please refer to the [LICENSE](LICENSE) file included in this repository.
+2026 - This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license. For more details, please refer to the [LICENSE](LICENSE) file included in this repository.
