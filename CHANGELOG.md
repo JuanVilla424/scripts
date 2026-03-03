@@ -1,78 +1,190 @@
-## [1.0.8] - 2024-10-27
+## [1.1.14] - 2025-04-06
 
-### Styles
+### Bug Fixes
 
-- **core**: fixed confs (`patch candidate`)
-
-### Other Changes
-
-- from prod - from test - from dev - Bump version: 1.0.7 → 1.0.8 into test (#11)Automatically created pull request for release v1.0.8-dev into testbranch. into prod (#12)Automatically created pull request for release v1.0.8-test into prodbranch. into main (#13)
-- from test - from dev - Bump version: 1.0.7 → 1.0.8 into test (#11)Automatically created pull request for release v1.0.8-dev into testbranch. into prod (#12)
-- from dev - Bump version: 1.0.7 → 1.0.8 into test (#11)
-- Bump version: 1.0.7 → 1.0.8
-- Update CNAME
-- Update CNAME
-- Create CNAME
-
-## [1.0.7] - 2024-10-27
-
-### Styles
-
-- **core**: fixed confs (`patch candidate`)
-- **core**: fixed confs (`patch candidate`)
-- **core**: fixed confs (`patch candidate`)
-- **core**: fixed confs (`patch candidate`)
+- **core**: deps update (`patch candidate`)
 
 ### Other Changes
 
-- from prod - from test - from dev - Bump version: 1.0.6 → 1.0.7 into test (#8)Automatically created pull request for release v1.0.7-dev into testbranch. into prod (#9)Automatically created pull request for release v1.0.7-test into prodbranch. into main (#10)
-- from test - from dev - Bump version: 1.0.6 → 1.0.7 into test (#8)Automatically created pull request for release v1.0.7-dev into testbranch. into prod (#9)
-- from dev - Bump version: 1.0.6 → 1.0.7 into test (#8)
-- Bump version: 1.0.6 → 1.0.7
-- Bump version: 1.0.5 → 1.0.6
-- Bump version: 1.0.4 → 1.0.5
-- Bump version: 1.0.3 → 1.0.4
+- deps: update setuptools requirement from ^75.2.0 to ^78.1.0 (#64)
+- deps: update isort requirement from ^5.12.0 to ^6.0.1 (#61)
+- deps: update certifi requirement from ^2024.8.30 to ^2025.1.31 (#60)
+- deps: update black requirement from ^24.3.0 to ^25.1.0 (#59)
+- deps: update setuptools requirement from ^75.2.0 to ^78.1.0
+- deps: update isort requirement from ^5.12.0 to ^6.0.1
+- deps: update certifi requirement from ^2024.8.30 to ^2025.1.31
+- deps: update black requirement from ^24.3.0 to ^25.1.0
 
-## [1.0.3] - 2024-10-27
+## [1.1.13] - 2025-01-07
+
+### Documentation
+
+- **core**: bump year version (`patch candidate`)
+
+## [1.1.12] - 2025-01-07
+
+### Documentation
+
+- **core**: bump year version (`patch candidate`)
+
+### Chores
+
+- **core**: bump year version (`patch candidate`)
+
+## [1.1.10] - 2024-11-07
 
 ### Styles
 
-- **core**: added readme file (`patch candidate`)
-- **core**: added readme file (`patch candidate`)
+- **core**: fixed md files (`patch candidate`)
+- **core**: fixed license
+- **core**: fixed license
+- **core**: fixed license
+- **core**: fixed readme
+- **core**: fixed readme and license
 
 ### Other Changes
 
-- from prod - from test - from dev - Bump version: 1.0.2 → 1.0.3 into test (#5)Automatically created pull request for release v1.0.3-dev into testbranch. into prod (#6)Automatically created pull request for release v1.0.3-test into prodbranch. into main (#7)
-- from test - from dev - Bump version: 1.0.2 → 1.0.3 into test (#5)Automatically created pull request for release v1.0.3-dev into testbranch. into prod (#6)
-- from dev - Bump version: 1.0.2 → 1.0.3 into test (#5)
-- Bump version: 1.0.2 → 1.0.3
-- Bump version: 1.0.1 → 1.0.2
-- style(core): added readme file
+- deps: update pytest-cov requirement from ^5.0.0 to ^6.0.0 (#45)
+- deps: update pytest-cov requirement from ^5.0.0 to ^6.0.0
 
-## [1.0.1] - 2024-10-27
+## [1.1.9] - 2024-10-29
 
 ### Features
 
-- **core**: add cicd flows (`patch candidate`)
+- **core**: added crypto controller (`patch candidate`)
+- **core**: added crypto controller times on debug
+- **core**: added crypto controller validation status and timestamp
+- **core**: added status verify on crypto controller
+
+### Bug Fixes
+
+- **core**: fixed crypto controller logging levels
+- **core**: fixed crypto controller expiration years
+
+### Styles
+
+- **core**: fixed crypto_controller readme
+- **core**: fixed crypto_controller readme
+- **core**: visual changes on readme, local env
+
+## [1.1.8] - 2024-10-27
+
+### Styles
+
+- **core**: added kofi (`patch candidate`)
+
+## [1.1.7] - 2024-10-27
+
+### Features
+
+- **core**: refactored init security config script (`patch candidate`)
+
+## [1.1.6] - 2024-10-27
+
+### Features
+
+- **core**: icons parse (`patch candidate`)
+- **core**: icons parse (`patch candidate`)
+- **core**: icons parse (`patch candidate`)
+- **core**: icons parse (`patch candidate`)
+
+## [1.1.2] - 2024-10-27
+
+### Features
+
+- **core**: fix commit icons and commit regex validation (`patch candidate`)
+- **core**: added commit icons and commit regex validation (`minor candidate`)
+
+### Bug Fixes
+
+- **core**: fix commit icons and commit regex validation (`patch candidate`)
+
+### Chores
+
+- **core**: test icons
+- **core**: test icons
+- **core**: test icons (`patch candidate`)
+- **core**: test icons (`patch candidate`)
+- **core**: test icons
+- **core**: test icons flow
+
+## [1.0.17] - 2024-10-27
+
+### Chores
+
+- **core**: test icons flow (`patch candidate`)
+- **core**: test version controller (`patch candidate`)
+
+## [1.0.13] - 2024-10-27
+
+### Chores
+
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **core**: test bump commit msg version (`patch candidate`)
+- **style**: test bump version msg (`patch candidate`)
+- **style**: test bump version msg (`patch candidate`)
+- **style**: test bump version msg (`patch candidate`)
 
 ### Other Changes
 
-- from prod - from test - from dev - Bump version: 1.0.0 → 1.0.1 into test (#1)Automatically created pull request for release v1.0.1-dev into testbranch. into prod (#2)Automatically created pull request for release v1.0.1-test into prodbranch. into main (#3)
-- from test - from dev - Bump version: 1.0.0 → 1.0.1 into test (#1)Automatically created pull request for release v1.0.1-dev into testbranch. into prod (#2)
-- from dev - Bump version: 1.0.0 → 1.0.1 into test (#1)
-- Bump version: 1.0.0 → 1.0.1
-- feat(core): fix cicd flows
-- feat(core): added cicd flows
-- rebased scripts
-- feat: added scripts
-- Initial commit
+- ðŸ”§ chore(core): test bump commit msg version [patch candidate]
 
-## [Unreleased] - 2024-10-27
+## [1.0.10] - 2024-10-26
 
 ### Chores
 
 - **style**: fixed bump year flow (`patch candidate`)
+- **style**: fixed bump year flow (`patch candidate`)
+- **core**: added crypto controller
+
+## [1.0.8] - 2024-10-23
+
+### Styles
+
+- **core**: fixed confs (`patch candidate`)
 
 ### Other Changes
 
-- chore(core): added crypto controller
+- Update CNAME
+- Update CNAME
+- Create CNAME
+
+## [1.0.7] - 2024-10-23
+
+### Styles
+
+- **core**: fixed confs (`patch candidate`)
+- **core**: fixed confs (`patch candidate`)
+- **core**: fixed confs (`patch candidate`)
+- **core**: fixed confs (`patch candidate`)
+
+## [1.0.3] - 2024-10-23
+
+### Styles
+
+- **core**: added readme file (`patch candidate`)
+- **core**: added readme file (`patch candidate`)
+- **core**: added readme file
+
+## [1.0.1] - 2024-10-23
+
+### Features
+
+- **core**: add cicd flows (`patch candidate`)
+- **core**: fix cicd flows
+- **core**: added cicd flows
+- added scripts
+
+### Other Changes
+
+- rebased scripts
+- Initial commit
