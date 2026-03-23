@@ -27,7 +27,7 @@ toml = "^0.10.0"
 black = "^26.1.0"
 pytest = "^8.3.1"
 httpx = { version = ">=0.24.0", optional = true }
-pytest-cov = "^6.0.0"
+pytest-cov = "^7.1.0"
 coverage = "^7.2.5"
 
 [tool.poetry.extras]
