@@ -115,8 +115,9 @@ def fetch_tags() -> None:
         subprocess.check_output(["git", "fetch", "--tags"])
         logger.info("Successfully fetched Git tags.")
     except subprocess.CalledProcessError as error:
-        logger.error(f"Error fetching Git tags: {error}")
-        raise
+        logger.warning(
+            f"Could not fetch Git tags from remote (continuing with local tags): {error}"
+        )
 
 
 def parse_version(version_str: str) -> Tuple[int, int, int]:
