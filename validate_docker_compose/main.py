@@ -40,7 +40,7 @@ def validate_docker_compose(file_path):
     """
     try:
         result = subprocess.run(
-            ["docker-compose", "-f", file_path, "config"],
+            ["docker", "compose", "-f", file_path, "config"],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -54,7 +54,7 @@ def validate_docker_compose(file_path):
         print(e.stderr)
         sys.exit(1)
     except FileNotFoundError:
-        print("[ERROR] docker-compose not found.")
+        print("[ERROR] docker compose not found.")
         sys.exit(1)
 
 
