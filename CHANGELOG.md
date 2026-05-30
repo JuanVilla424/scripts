@@ -1,3 +1,17 @@
+## [1.1.19] - 2026-03-03
+
+### Features
+
+- **core**: add inline release creation to version controller (`patch candidate`)
+
+### Bug Fixes
+
+- **core**: add pull-requests write permission to version controller (`patch candidate`)
+
+### Documentation
+
+- **core**: update changelog
+
 ## [1.1.17] - 2026-03-03
 
 ### Bug Fixes
