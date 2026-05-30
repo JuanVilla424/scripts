@@ -97,14 +97,17 @@ jobs:
           VERSION=${{ steps.get_version.outputs.current_version }}
           BRANCH_NAME=${{ steps.determine_branch.outputs.current_branch }}
           TAG_NAME="v${VERSION}-${BRANCH_NAME}"
-          git tag "$TAG_NAME"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists — skipping creation"
+          else
+            git tag "$TAG_NAME"
+          fi
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-        continue-on-error: true
       - name: Push Tag
         id: push_tag
-        if: steps.check_arrow.outputs.contains_arrow == 'true'
+        if: steps.check_arrow.outputs.contains_arrow == 'true' && steps.create_tag.outputs.tag_name != ''
         run: |
-          git push origin "${{ steps.create_tag.outputs.tag_name }}"
+          git push origin "${{ steps.create_tag.outputs.tag_name }}" || echo "Tag already on remote — skipping"
       - name: Ensure on Current Branch
         id: ensure_branch
         if: steps.check_arrow.outputs.contains_arrow == 'true'
