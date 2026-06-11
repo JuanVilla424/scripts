@@ -56,10 +56,34 @@ exclude = '''
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--cov=app --cov-report=xml:coverage.xml --cov-report=term"
+addopts = "--cov --cov-report=xml:coverage.xml --cov-report=term"
 testpaths = ["tests"]
 pythonpath = [
   ".", "crypto_controller"
+]
+
+[tool.coverage.run]
+source = [
+  "bump_year",
+  "commit_msg_version_bump",
+  "control_commit",
+  "crypto_controller",
+  "format_yaml",
+  "format_yml",
+  "generate_changelog",
+  "init_security_config",
+  "init_template",
+  "validate_container_names",
+  "validate_docker_compose",
+]
+
+[tool.coverage.report]
+fail_under = 96
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+  "raise EnvironmentError",
+  "except KeyError as e_key_error_fetch_password:",
 ]
 
 [tool.isort]

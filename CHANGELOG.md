@@ -1,3 +1,9 @@
+## [1.1.20] - 2026-05-30
+
+### Documentation
+
+- **core**: update changelog
+
 ## [1.1.19] - 2026-03-03
 
 ### Features

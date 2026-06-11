@@ -46,7 +46,7 @@ fail-under=8
 #from-stdin=
 
 # Files or directories to be skipped. They should be base names, not paths.
-ignore=venv,node_modules,scripts
+ignore=venv,.venv,env,node_modules,scripts,.git,__pycache__,build,dist,.eggs,.mypy_cache,.pytest_cache,.ruff_cache,.tox,htmlcov,coverage,.next
 
 # Add files or directories matching the regular expressions patterns to the
 # ignore-list. The regex matches against paths and can be in Posix or Windows
@@ -106,7 +106,6 @@ source-roots=
 
 # When enabled, pylint would attempt to guess common misconfiguration and emit
 # user-friendly hints instead of false-positive error messages.
-suggestion-mode=yes
 
 # Allow loading of arbitrary C extensions. Extensions are imported into the
 # active Python interpreter and may run arbitrary code.
