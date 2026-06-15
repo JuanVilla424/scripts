@@ -161,24 +161,41 @@ def test_stage_changes_failure_exits_1(mocker):
 
 def test_amend_commit_invokes_git(mocker):
     """The commit is amended with the bump message."""
-    mock_run = mocker.patch("commit_msg_version_bump.main.subprocess.run")
+    mock_run = mocker.patch(
+        "commit_msg_version_bump.main.subprocess.run",
+        return_value=subprocess.CompletedProcess(args=[], returncode=0),
+    )
     amend_commit("🔖 Bump version: 1.0.0 → 1.0.1")
     mock_run.assert_called_once_with(
         ["git", "commit", "--amend", "-m", "🔖 Bump version: 1.0.0 → 1.0.1"],
-        check=True,
         encoding="utf-8",
     )
 
 
 def test_amend_commit_failure_exits_1(mocker):
-    """A git amend failure exits with code 1."""
+    """An amend that keeps being aborted by hooks exits with code 1 after retries."""
     mocker.patch(
         "commit_msg_version_bump.main.subprocess.run",
-        side_effect=subprocess.CalledProcessError(1, "git"),
+        return_value=subprocess.CompletedProcess(args=[], returncode=1),
     )
     with pytest.raises(SystemExit) as exc_info:
         amend_commit("🔖 Bump version: 1.0.0 → 1.0.1")
     assert exc_info.value.code == 1
+
+
+def test_amend_commit_restages_and_retries_when_hooks_modify_files(mocker):
+    """When pre-commit hooks modify files, the amend re-stages (git add -u) and retries."""
+    mock_run = mocker.patch(
+        "commit_msg_version_bump.main.subprocess.run",
+        side_effect=[
+            subprocess.CompletedProcess(args=[], returncode=1),  # 1st amend aborted by hooks
+            subprocess.CompletedProcess(args=[], returncode=0),  # git add -u
+            subprocess.CompletedProcess(args=[], returncode=0),  # 2nd amend succeeds
+        ],
+    )
+    amend_commit("🔖 Bump version: 1.0.0 → 1.0.1")
+    assert mock_run.call_count == 3
+    assert any(call.args[0] == ["git", "add", "-u"] for call in mock_run.call_args_list)
 
 
 def test_main_with_candidate_bumps_and_exits_1(tmp_path, monkeypatch, mocker):
