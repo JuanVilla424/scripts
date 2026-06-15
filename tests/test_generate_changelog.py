@@ -325,17 +325,13 @@ def test_update_changelog_write_error_returns_false(tmp_path, monkeypatch):
 
 
 def test_main_generates_and_updates(mocker):
-    """main() builds the changelog from tags and hands it to update_changelog."""
+    """main() builds the changelog from bump-version history and hands it to update_changelog."""
     mocker.patch("generate_changelog.main.fetch_tags")
-    mocker.patch("generate_changelog.main.get_sorted_tags", return_value=["v1.0.0"])
     mocker.patch(
-        "generate_changelog.main.get_tag_dates",
-        return_value={"1.0.0": "2026-01-01", "Unreleased": TODAY_UTC},
+        "generate_changelog.main.get_version_history",
+        return_value=[{"version": "1.0.0", "commit": "abc123", "date": "2026-01-01"}],
     )
-    mocker.patch(
-        "generate_changelog.main.get_all_commits",
-        return_value=OrderedDict([("1.0.0", ["feat: first"])]),
-    )
+    mocker.patch("generate_changelog.main.get_commits_between_tags", return_value=["feat: first"])
     mock_update = mocker.patch("generate_changelog.main.update_changelog", return_value=True)
 
     gcl.main()
@@ -349,11 +345,11 @@ def test_main_generates_and_updates(mocker):
 def test_main_without_commits_does_not_update(mocker, caplog):
     """main() skips the update when there is nothing to include."""
     mocker.patch("generate_changelog.main.fetch_tags")
-    mocker.patch("generate_changelog.main.get_sorted_tags", return_value=["v1.0.0"])
-    mocker.patch("generate_changelog.main.get_tag_dates", return_value={"Unreleased": TODAY_UTC})
     mocker.patch(
-        "generate_changelog.main.get_all_commits", return_value=OrderedDict([("1.0.0", [])])
+        "generate_changelog.main.get_version_history",
+        return_value=[{"version": "1.0.0", "commit": "abc123", "date": "2026-01-01"}],
     )
+    mocker.patch("generate_changelog.main.get_commits_between_tags", return_value=[])
     mock_update = mocker.patch("generate_changelog.main.update_changelog")
 
     with caplog.at_level(logging.INFO, logger="generate_changelog.main"):
@@ -366,6 +362,23 @@ def test_main_without_commits_does_not_update(mocker, caplog):
 def test_main_logs_when_no_update_needed(mocker, caplog):
     """main() reports when the changelog content did not change."""
     mocker.patch("generate_changelog.main.fetch_tags")
+    mocker.patch(
+        "generate_changelog.main.get_version_history",
+        return_value=[{"version": "1.0.0", "commit": "abc123", "date": "2026-01-01"}],
+    )
+    mocker.patch("generate_changelog.main.get_commits_between_tags", return_value=["feat: first"])
+    mocker.patch("generate_changelog.main.update_changelog", return_value=False)
+
+    with caplog.at_level(logging.INFO, logger="generate_changelog.main"):
+        gcl.main()
+
+    assert "Changelog was not updated" in caplog.text
+
+
+def test_main_falls_back_to_tags_without_bump_commits(mocker):
+    """Without bump-version commits, main() falls back to the legacy tag-based path."""
+    mocker.patch("generate_changelog.main.fetch_tags")
+    mocker.patch("generate_changelog.main.get_version_history", return_value=[])
     mocker.patch("generate_changelog.main.get_sorted_tags", return_value=["v1.0.0"])
     mocker.patch(
         "generate_changelog.main.get_tag_dates",
@@ -375,9 +388,60 @@ def test_main_logs_when_no_update_needed(mocker, caplog):
         "generate_changelog.main.get_all_commits",
         return_value=OrderedDict([("1.0.0", ["feat: first"])]),
     )
-    mocker.patch("generate_changelog.main.update_changelog", return_value=False)
+    mock_update = mocker.patch("generate_changelog.main.update_changelog", return_value=True)
 
-    with caplog.at_level(logging.INFO, logger="generate_changelog.main"):
-        gcl.main()
+    gcl.main()
 
-    assert "Changelog was not updated" in caplog.text
+    content = mock_update.call_args.args[0]
+    assert "## [1.0.0] - 2026-01-01" in content
+
+
+def test_normalize_version_handles_v_prefix_and_suffix():
+    """normalize_version tolerates an optional 'v' and pre-release suffixes."""
+    assert gcl.normalize_version("v1.2.8-development") == "1.2.8"
+    assert gcl.normalize_version("1.2.8") == "1.2.8"
+    assert gcl.normalize_version("V1.2.8") == "1.2.8"
+    assert gcl.normalize_version("  v2.0.0  ") == "2.0.0"
+
+
+def test_get_version_history_parses_bump_commits(mocker):
+    """Versions come from 'Bump version: X -> Y'; CI 'into' promotions are ignored."""
+    log = (
+        "h1\x1f2026-01-01 00:00:00 +0000\x1fBump version: 1.0.0 → 1.0.1\n"
+        "h2\x1f2026-01-02 00:00:00 +0000\x1ffeat: work\n"
+        "h3\x1f2026-01-03 00:00:00 +0000\x1fBump version: v1.0.1 -> v1.0.2\n"
+        "h4\x1f2026-01-04 00:00:00 +0000\x1fFrom development → Bump version: "
+        "v1.0.3-development into testing\n"
+    )
+    mocker.patch("generate_changelog.main.subprocess.check_output", return_value=log)
+    history = gcl.get_version_history()
+    assert [entry["version"] for entry in history] == ["1.0.1", "1.0.2"]
+    assert history[0]["commit"] == "h1"
+    assert history[0]["date"] == "2026-01-01"
+
+
+def test_build_from_history_builds_ranges_and_dates(mocker):
+    """build_from_history maps each version to its commit range and date."""
+    mocker.patch(
+        "generate_changelog.main.get_commits_between_tags",
+        side_effect=[["feat: a"], ["fix: b"]],
+    )
+    history = [
+        {"version": "1.0.0", "commit": "c1", "date": "2026-01-01"},
+        {"version": "1.0.1", "commit": "c2", "date": "2026-01-02"},
+    ]
+    commits_dict, dates = gcl.build_from_history(history)
+    assert list(commits_dict.keys()) == ["1.0.0", "1.0.1"]
+    assert commits_dict["1.0.0"] == ["feat: a"]
+    assert dates["1.0.1"] == "2026-01-02"
+
+
+def test_generate_full_changelog_skips_noise_only_versions():
+    """A version whose range is all noise produces no (empty) entry."""
+    commits_dict = OrderedDict(
+        [("1.0.0", ["feat: real"]), ("1.0.1", ["Bump version: 1.0.0 -> 1.0.1"])]
+    )
+    dates = {"1.0.0": "2026-01-01", "1.0.1": "2026-01-02"}
+    content = gcl.generate_full_changelog(commits_dict, dates)
+    assert "## [1.0.0]" in content
+    assert "## [1.0.1]" not in content

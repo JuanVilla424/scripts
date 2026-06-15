@@ -1,22 +1,25 @@
 ## [1.1.20] - 2026-05-30
 
-### Documentation
-
-- **core**: update changelog
-
-## [1.1.19] - 2026-03-03
-
 ### Features
 
-- **core**: add inline release creation to version controller (`patch candidate`)
+- **core**: add validate container names script for cloudformation templates (`patch candidate`)
+
+### Bug Fixes
+
+- **core**: use docker compose v2 plugin instead of deprecated docker-compose v1
+- **core**: make fetch tags non-fatal in generate changelog hook
+
+## [1.1.19] - 2026-03-03
 
 ### Bug Fixes
 
 - **core**: add pull-requests write permission to version controller (`patch candidate`)
 
-### Documentation
+## [1.1.18] - 2026-03-03
 
-- **core**: update changelog
+### Features
+
+- **core**: add inline release creation to version controller (`patch candidate`)
 
 ## [1.1.17] - 2026-03-03
 
@@ -24,21 +27,13 @@
 
 - **core**: use access token for tag push to trigger release workflow (`patch candidate`)
 
-### Documentation
-
-- **core**: update changelog
-
 ## [1.1.16] - 2026-03-03
 
 ### Features
 
 - **core**: add inline release notes and update cicd workflows (`patch candidate`)
 
-### Documentation
-
-- **core**: update changelog
-
-## [1.1.15] - 2026-03-02
+## [1.1.15] - 2026-03-03
 
 ### Bug Fixes
 
@@ -94,6 +89,8 @@
 
 - **core**: bump year version (`patch candidate`)
 
+## [1.1.11] - 2025-01-07
+
 ### Chores
 
 - **core**: bump year version (`patch candidate`)
@@ -113,6 +110,9 @@
 
 - deps: update pytest-cov requirement from ^5.0.0 to ^6.0.0 (#45)
 - deps: update pytest-cov requirement from ^5.0.0 to ^6.0.0
+- Update CNAME
+- Update CNAME
+- Create CNAME
 
 ## [1.1.9] - 2024-10-29
 
@@ -157,20 +157,37 @@
 
 ## [1.1.2] - 2024-10-27
 
-### Features
-
-- **core**: fix commit icons and commit regex validation (`patch candidate`)
-- **core**: added commit icons and commit regex validation (`minor candidate`)
-
 ### Bug Fixes
 
 - **core**: fix commit icons and commit regex validation (`patch candidate`)
+
+## [1.1.1] - 2024-10-27
+
+### Features
+
+- **core**: fix commit icons and commit regex validation (`patch candidate`)
+
+## [1.1.0] - 2024-10-27
+
+### Features
+
+- **core**: added commit icons and commit regex validation (`minor candidate`)
 
 ### Chores
 
 - **core**: test icons
 - **core**: test icons
+
+## [1.0.19] - 2024-10-27
+
+### Chores
+
 - **core**: test icons (`patch candidate`)
+
+## [1.0.18] - 2024-10-27
+
+### Chores
+
 - **core**: test icons (`patch candidate`)
 - **core**: test icons
 - **core**: test icons flow
@@ -180,6 +197,11 @@
 ### Chores
 
 - **core**: test icons flow (`patch candidate`)
+
+## [1.0.14] - 2024-10-27
+
+### Chores
+
 - **core**: test version controller (`patch candidate`)
 
 ## [1.0.13] - 2024-10-27
@@ -210,6 +232,11 @@
 ### Chores
 
 - **style**: fixed bump year flow (`patch candidate`)
+
+## [1.0.9] - 2024-10-26
+
+### Chores
+
 - **style**: fixed bump year flow (`patch candidate`)
 - **core**: added crypto controller
 
@@ -219,19 +246,28 @@
 
 - **core**: fixed confs (`patch candidate`)
 
-### Other Changes
-
-- Update CNAME
-- Update CNAME
-- Create CNAME
-
 ## [1.0.7] - 2024-10-23
 
 ### Styles
 
 - **core**: fixed confs (`patch candidate`)
+
+## [1.0.6] - 2024-10-23
+
+### Styles
+
 - **core**: fixed confs (`patch candidate`)
+
+## [1.0.5] - 2024-10-23
+
+### Styles
+
 - **core**: fixed confs (`patch candidate`)
+
+## [1.0.4] - 2024-10-23
+
+### Styles
+
 - **core**: fixed confs (`patch candidate`)
 
 ## [1.0.3] - 2024-10-23
@@ -239,6 +275,11 @@
 ### Styles
 
 - **core**: added readme file (`patch candidate`)
+
+## [1.0.2] - 2024-10-23
+
+### Styles
+
 - **core**: added readme file (`patch candidate`)
 - **core**: added readme file
 
