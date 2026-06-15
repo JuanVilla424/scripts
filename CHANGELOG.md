@@ -1,3 +1,9 @@
+## [1.1.23] - 2026-06-15
+
+### Chores
+
+- **core**: re-trigger promotion through to main (`patch candidate`)
+
 ## [1.1.22] - 2026-06-15
 
 ### Bug Fixes
