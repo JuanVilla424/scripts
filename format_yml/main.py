@@ -38,20 +38,16 @@ def format_yml_file(file_path):
 
         while len(line) > 120:
             split_pos = line.rfind(" ", 0, 120)
-            if split_pos != -1:
+            if split_pos > current_indent:
                 split_line1 = line[:split_pos] + " \\"
-                split_line2 = " " * current_indent + " " + line[split_pos + 1 :].lstrip()
+                line = " " * current_indent + " " + line[split_pos + 1 :].lstrip()
                 new_lines.append(split_line1)
-                new_lines.append(split_line2)
                 print(f"[FORMAT] Split long line at line {i} in {file_path}.")
-                continue
-            if not split_pos != -1:
+            else:
                 split_line1 = line[:120] + " \\"
-                split_line2 = " " * current_indent + " " + line[120 + 1 :].lstrip()
+                line = " " * current_indent + " " + line[120:].lstrip()
                 new_lines.append(split_line1)
-                new_lines.append(split_line2)
                 print(f"[FORMAT] Force split long line at line {i} in {file_path}.")
-                continue
 
         new_lines.append(line)
 
@@ -61,7 +57,6 @@ def format_yml_file(file_path):
         f.write(formatted_content)
 
     print(f"[FORMAT] Formatted {file_path} with LF line endings.")
-    sys.exit(0)
 
 
 def main():

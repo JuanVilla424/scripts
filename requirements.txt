@@ -1,33 +1,22 @@
-# Pre-Commit for pre-commit hooks management
-pre-commit>=4.0.0
+# ─────────────────────────────────────────────────────────────────────────────
+# Runtime dependencies — mirrors [tool.poetry.dependencies] in pyproject.toml.
+# Development / CI tooling lives in requirements.dev.txt.
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Pylint for python lint
-pylint>=3.3.1
-
-# YamlLint for YAML lint
-yamllint>=1.35.1
-
-# Poetry for package management alternative
-poetry>=1.8.4
+# Setuptools / Wheel for builds
+setuptools>=82.0.1
+wheel>=0.47.0
 
 # Bump2Version for version release control
-bump2version>=1.0.0
+bump2version>=1.0.1
 
-# Toml for pyproject.toml management
-toml>=0.10.1
-
-# Black for Code Formatting
-black>=24.3.0
-
-# Pytest for Unit/Integration Testing
-pytest>=7.3.1
-pytest-cov>=5.0.0
-
-# Coverage Reporting
-coverage>=7.2.5
-
-requests~=2.32.4
-
+# Python-dotenv for environment management
 python-dotenv>=1.0.0
 
-cryptography>=44.0.0
+# Requests + certifi + idna for HTTP and TLS
+requests>=2.34.2
+certifi>=2026.5.20
+idna>=3.18
+
+# Cryptography for key management / encryption
+cryptography>=46.0.5

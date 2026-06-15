@@ -117,7 +117,7 @@ jobs:
         run: |
           zip -r "${REPO_NAME}-${GITHUB_REF_NAME}.zip" \
             {INSTALL,SECURITY,README,ICONS,CONTRIBUTING,CODE_OF_CONDUCT}.md \
-            requirements.txt .github scripts *adm* smtp-relay elastalert \
+            requirements.txt requirements.dev.txt .github scripts *adm* smtp-relay elastalert \
             pyproject.toml
         env:
           REPO_NAME: ${{ env.REPO_NAME }}
