@@ -1,3 +1,15 @@
+## [1.1.21] - 2026-06-15
+
+### Bug Fixes
+
+- **core**: derive changelog versions from bump commits to close gaps (`patch candidate`)
+- **core**: resolve key pair year rollover, formatter hook bugs and enforce 96 coverage gate
+- **core**: handle existing tag gracefully in version-controller workflow
+- **deps**: update setuptools requirement from ^82.0.0 to ^82.0.1 (#115)
+- **deps**: update requests requirement from ^2.32.3 to ^2.34.2 (#114)
+- **deps**: update bump2version requirement from ^1.0.0 to ^1.0.1 (#113)
+- **deps**: update pytest requirement from ^8.3.1 to ^9.0.3 (#112)
+
 ## [1.1.20] - 2026-05-30
 
 ### Features
