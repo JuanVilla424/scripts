@@ -1,0 +1,25 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Development / CI dependencies — mirrors [tool.poetry.group.dev.dependencies].
+# Runtime dependencies live in requirements.txt.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Pre-Commit for hook management
+pre-commit>=4.0.0
+
+# Linters and formatters
+pylint>=4.0.5
+yamllint>=1.35.0
+isort>=6.0.1
+black>=26.1.0
+
+# Toml for pyproject.toml management
+toml>=0.10.0
+
+# Poetry for package management
+poetry>=2.4.1
+
+# Testing
+pytest>=9.0.3
+pytest-cov>=6.0.0
+coverage>=7.2.5
+httpx>=0.28.1
