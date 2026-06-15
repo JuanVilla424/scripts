@@ -1,3 +1,15 @@
+## [1.1.22] - 2026-06-15
+
+### Bug Fixes
+
+- **deps**: split runtime and dev requirements and resolve requests advisory
+- **core**: restage tracked changes and retry amend in version bump hook
+
+### Chores
+
+- **core**: promote release through to main (`patch candidate`)
+- **core**: merge test into dev to resolve 1.1.21 promotion conflicts
+
 ## [1.1.21] - 2026-06-15
 
 ### Bug Fixes
