@@ -43,6 +43,15 @@ NOISE_PATTERNS = [
     re.compile(r"from \w+ - from \w+", re.IGNORECASE),
 ]
 
+# Matches a bump2version commit "Bump version: <old> → <new>" (robust to a leading 'v'
+# and to pre-release suffixes on either side). CI promotion commits
+# ("From <branch> → Bump version: vX.Y.Z-<branch> into <target>") use "into" instead of
+# the arrow, so they are NOT matched here.
+BUMP_VERSION_REGEX = re.compile(
+    r"Bump version:\s*v?\d+\.\d+\.\d+\S*\s*(?:→|->)\s*(?P<new>v?\d+\.\d+\.\d+)",
+    re.IGNORECASE,
+)
+
 # Mapping of commit types to changelog sections
 TYPE_MAPPING = {
     "feat": "### Features",
@@ -174,6 +183,88 @@ def compare_versions(v1: str, v2: str) -> int:
         return -1
 
     return 0
+
+
+def normalize_version(version_str: str) -> str:
+    """
+    Normalizes a version string to bare 'X.Y.Z', tolerating an optional leading 'v'
+    and any pre-release suffix (e.g. 'v1.2.8-development' -> '1.2.8', '1.2.8' -> '1.2.8').
+
+    Args:
+        version_str (str): The raw version string.
+
+    Returns:
+        str: The normalized 'X.Y.Z' string.
+    """
+    s = version_str.strip()
+    if s[:1].lower() == "v":
+        s = s[1:]
+    return s.split("-")[0]
+
+
+def get_version_history() -> List[Dict[str, str]]:
+    """
+    Derives the released version sequence from 'Bump version: X -> Y' commits,
+    ordered oldest to newest. This is independent of tags, so every bumped version is
+    documented even if it never received a release tag (closing changelog gaps).
+
+    Returns:
+        List[Dict[str, str]]: List of {"version": 'X.Y.Z', "commit": <hash>, "date": 'YYYY-MM-DD'}.
+    """
+    try:
+        output = subprocess.check_output(
+            ["git", "log", "--reverse", "--pretty=format:%H\x1f%ai\x1f%s"],
+            encoding="utf-8",
+        )
+    except subprocess.CalledProcessError as error:
+        logger.error(f"Error retrieving commit history: {error}")
+        return []
+
+    history: List[Dict[str, str]] = []
+    seen = set()
+    for line in output.split("\n"):
+        if not line.strip():
+            continue
+        parts = line.split("\x1f")
+        if len(parts) != 3:
+            continue
+        commit_hash, date_str, subject = parts
+        match = BUMP_VERSION_REGEX.search(subject)
+        if not match:
+            continue
+        version = normalize_version(match.group("new"))
+        if version in seen:
+            continue
+        seen.add(version)
+        history.append({"version": version, "commit": commit_hash, "date": date_str.split(" ")[0]})
+
+    # Sort by semantic version so the changelog stays consistent even if history was rebased.
+    history.sort(key=lambda entry: parse_version(entry["version"]))
+    logger.debug(f"Derived {len(history)} versions from bump commits.")
+    return history
+
+
+def build_from_history(
+    history: List[Dict[str, str]],
+) -> Tuple[Dict[str, List[str]], Dict[str, str]]:
+    """
+    Builds the per-version commit map and dates from the bump-version history.
+    Commits in (previous_bump, current_bump] belong to the current version.
+
+    Args:
+        history (List[Dict[str, str]]): Output of get_version_history() (ascending).
+
+    Returns:
+        Tuple[Dict[str, List[str]], Dict[str, str]]: (commits_by_version, dates_by_version).
+    """
+    commits_dict: Dict[str, List[str]] = OrderedDict()
+    dates: Dict[str, str] = {}
+    previous_commit = ""
+    for entry in history:
+        commits_dict[entry["version"]] = get_commits_between_tags(previous_commit, entry["commit"])
+        dates[entry["version"]] = entry["date"]
+        previous_commit = entry["commit"]
+    return commits_dict, dates
 
 
 def is_noise_commit(commit: str) -> bool:
@@ -480,6 +571,10 @@ def generate_full_changelog(commits_dict: Dict[str, List[str]], tag_dates: Dict[
         if not commits:
             continue
         changelog, non_conforming = parse_commits(commits)
+        # Skip versions whose range is entirely noise (bumps/merges) to avoid empty headers.
+        if not changelog and not non_conforming:
+            logger.debug(f"Skipping version {version} with no conforming commits.")
+            continue
         date = tag_dates.get(version, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
         changelog_entry = generate_changelog_entry(version, changelog, non_conforming, date)
         changelog_content += changelog_entry
@@ -536,9 +631,19 @@ def main() -> None:
     Main function to generate or update the CHANGELOG.md.
     """
     fetch_tags()
-    sorted_tags = get_sorted_tags()
-    tag_dates = get_tag_dates(sorted_tags)
-    commits_dict = get_all_commits(sorted_tags)
+
+    # Primary: derive every version from 'Bump version: X -> Y' commits so no bumped
+    # version is skipped (tag-independent). Fallback: legacy tag-based generation for
+    # repositories that do not use bump-version commits.
+    history = get_version_history()
+    if history:
+        commits_dict, tag_dates = build_from_history(history)
+    else:
+        logger.info("No bump-version commits found; falling back to tag-based changelog.")
+        sorted_tags = get_sorted_tags()
+        tag_dates = get_tag_dates(sorted_tags)
+        commits_dict = get_all_commits(sorted_tags)
+
     changelog_content = generate_full_changelog(commits_dict, tag_dates)
 
     if not changelog_content:

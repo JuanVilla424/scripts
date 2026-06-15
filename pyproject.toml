@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scripts"
-version = "1.1.20"
+version = "1.1.22"
 description = "CICD Core Scripts"
 authors = ["B <g46327wsj1.marbling129@passinbox.com>"]
 license = "GLPv3"
@@ -10,13 +10,13 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.12"
 setuptools = "^82.0.1"
-idna = "^3.0"
-certifi = "^2026.1.4"
+idna = "^3.18"
+certifi = "^2026.5.20"
 bump2version = "^1.0.1"
 python-dotenv = "^1.0.0"
 cryptography = "^46.0.5"
 requests = "^2.34.2"
-wheel = ">=0.36.2"
+wheel = ">=0.47.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.0.0"
@@ -26,7 +26,7 @@ isort = "^6.0.1"
 toml = "^0.10.0"
 black = "^26.1.0"
 pytest = "^9.0.3"
-httpx = { version = ">=0.24.0", optional = true }
+httpx = { version = ">=0.28.1", optional = true }
 pytest-cov = "^6.0.0"
 coverage = "^7.2.5"
 
@@ -56,10 +56,34 @@ exclude = '''
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--cov=app --cov-report=xml:coverage.xml --cov-report=term"
+addopts = "--cov --cov-report=xml:coverage.xml --cov-report=term"
 testpaths = ["tests"]
 pythonpath = [
   ".", "crypto_controller"
+]
+
+[tool.coverage.run]
+source = [
+  "bump_year",
+  "commit_msg_version_bump",
+  "control_commit",
+  "crypto_controller",
+  "format_yaml",
+  "format_yml",
+  "generate_changelog",
+  "init_security_config",
+  "init_template",
+  "validate_container_names",
+  "validate_docker_compose",
+]
+
+[tool.coverage.report]
+fail_under = 96
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+  "raise EnvironmentError",
+  "except KeyError as e_key_error_fetch_password:",
 ]
 
 [tool.isort]
