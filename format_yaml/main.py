@@ -61,13 +61,12 @@ def format_yaml_file(file_path):
 
         new_lines.append(line)
 
-    formatted_content = "\n".join(lines) + "\n"
+    formatted_content = "\n".join(new_lines) + "\n"
 
     with open(file_path, "w", newline="\n", encoding="utf-8") as f:
         f.write(formatted_content)
 
     print(f"[FORMAT] Formatted {file_path} with LF line endings.")
-    sys.exit(0)
 
 
 def main():
