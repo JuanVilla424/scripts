@@ -233,26 +233,32 @@ def amend_commit(new_commit_msg: str) -> None:
     """
     Amends the current commit with the new commit message.
 
+    Pre-commit hooks (e.g. generate-changelog, prettier) may modify tracked files such
+    as CHANGELOG.md while the amend runs, which aborts the amend. We re-stage those
+    tracked changes with ``git add -u`` and retry so they are folded into the bump
+    commit. ``--no-verify``/``--force`` are never used (global rule): the hooks are
+    idempotent, so the retry converges once their changes are staged.
+
     Args:
         new_commit_msg (str): The new commit message.
-
-    Raises:
-        subprocess.CalledProcessError: If git amend fails.
     """
-    try:
-        # Amend the commit with the new commit message
-        subprocess.run(
-            ["git", "commit", "--amend", "-m", new_commit_msg],
-            check=True,
-            encoding="utf-8",
+    amend_cmd = ["git", "commit", "--amend", "-m", new_commit_msg]
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        result = subprocess.run(amend_cmd, encoding="utf-8")
+        if result.returncode == 0:
+            logger.info("Successfully amended the commit with the new version bump.")
+            logger.info(
+                "Please perform a push using 'git push' to update the remote repository. Avoid using --force"
+            )
+            return
+        logger.warning(
+            f"Amend attempt {attempt} aborted by pre-commit hooks modifying files; "
+            "re-staging tracked changes and retrying."
         )
-        logger.info("Successfully amended the commit with the new version bump.")
-        logger.info(
-            "Please perform a push using 'git push' to update the remote repository. Avoid using --force"
-        )
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to amend the commit: {e}")
-        sys.exit(1)
+        subprocess.run(["git", "add", "-u"], check=True, encoding="utf-8")
+    logger.error(f"Failed to amend the commit after {max_attempts} attempts.")
+    sys.exit(1)
 
 
 def main() -> None:

@@ -13,7 +13,8 @@ import requests
 import warnings
 import smtplib
 from email.mime.text import MIMEText
-import json  # Added import for JSON handling
+import json
+import re
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -536,6 +537,19 @@ class CryptoController:
             print("Failed to retrieve status. Check logs for more details.")
 
 
+def _resolve_key_pair_name(cert_location: str) -> str:
+    """Returns the active key pair name whose year range contains the current year."""
+    current_year = datetime.now().year
+    if os.path.isdir(cert_location):
+        for fname in os.listdir(cert_location):
+            match = re.match(r"^Crypto-Key-Pair-(\d{4})-(\d{4})\.kp$", fname)
+            if match:
+                start, end = int(match.group(1)), int(match.group(2))
+                if start <= current_year <= end:
+                    return fname[:-3]
+    return f"Crypto-Key-Pair-{current_year}-{current_year + int(CERT_EXPIRATION_YEARS)}"
+
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parses command-line arguments.
@@ -561,7 +575,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--key-pair-name",
-        default=f"Crypto-Key-Pair-{datetime.now().year}",
+        default=_resolve_key_pair_name(os.path.join(os.getcwd(), "certs")),
         help="Name of the key pair. Defaults to 'Crypto-Key-Pair-<YEAR>'.",
     )
     parser.add_argument(
