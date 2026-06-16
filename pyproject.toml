@@ -19,7 +19,7 @@ requests = "^2.34.2"
 wheel = ">=0.47.0"
 
 [tool.poetry.group.dev.dependencies]
-pre-commit = "^4.0.0"
+pre-commit = "^4.6.0"
 pylint="^4.0.5"
 yamllint="^1.35.0"
 isort = "^6.0.1"
