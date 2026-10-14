@@ -54,10 +54,12 @@ def test_configure_logger_sets_handlers(tmp_path, monkeypatch):
 def test_update_footer_replaces_previous_year(tmp_path):
     """The footer containing last year is bumped to the current year."""
     md_file = tmp_path / "README.md"
-    md_file.write_text(f"# Title\n\nSome text.\n\n© {CURRENT_YEAR - 1} Quipux\n", encoding="utf-8")
+    md_file.write_text(
+        f"# Title\n\nSome text.\n\n© {CURRENT_YEAR - 1} Example Corp\n", encoding="utf-8"
+    )
     update_markdown_footers([str(md_file)], CURRENT_YEAR)
     content = md_file.read_text(encoding="utf-8")
-    assert f"© {CURRENT_YEAR} Quipux" in content
+    assert f"© {CURRENT_YEAR} Example Corp" in content
     assert str(CURRENT_YEAR - 1) not in content
 
 
@@ -77,7 +79,7 @@ def test_update_footer_only_touches_last_matching_line(tmp_path):
 def test_update_footer_skips_file_already_at_current_year(tmp_path, caplog):
     """A footer already at the current year is left untouched."""
     md_file = tmp_path / "README.md"
-    original = f"© {CURRENT_YEAR} Quipux\n"
+    original = f"© {CURRENT_YEAR} Example Corp\n"
     md_file.write_text(original, encoding="utf-8")
     with caplog.at_level(logging.WARNING, logger="bump_year.main"):
         update_markdown_footers([str(md_file)], CURRENT_YEAR)
@@ -161,7 +163,7 @@ def test_collect_markdown_files_warns_on_missing_directory(tmp_path, caplog):
 def test_main_updates_collected_files(tmp_path, monkeypatch):
     """main() bumps the footer of the files referenced by the module-level args."""
     md_file = tmp_path / "README.md"
-    md_file.write_text(f"© {CURRENT_YEAR - 1} Quipux\n", encoding="utf-8")
+    md_file.write_text(f"© {CURRENT_YEAR - 1} Example Corp\n", encoding="utf-8")
     monkeypatch.setattr(
         bump_year_main,
         "args",
@@ -169,7 +171,7 @@ def test_main_updates_collected_files(tmp_path, monkeypatch):
         raising=False,
     )
     bump_year_main.main()
-    assert f"© {CURRENT_YEAR} Quipux" in md_file.read_text(encoding="utf-8")
+    assert f"© {CURRENT_YEAR} Example Corp" in md_file.read_text(encoding="utf-8")
 
 
 def test_main_logs_error_when_no_files(monkeypatch, caplog):
