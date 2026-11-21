@@ -11,19 +11,32 @@ from control_commit.main import (
     configure_logger,
     has_square_brackets,
     main,
-    read_commit_message,
+    read_head_commit_message,
     validate_commit_message,
 )
+
+REWORD_TEMPLATE = (
+    "# Please enter the commit message for your changes. Lines starting\n"
+    "# with '#' will be ignored, and an empty message aborts the commit.\n"
+)
+
+
+def _git(*args):
+    subprocess.run(["git", *args], check=True, capture_output=True)
 
 
 @pytest.fixture
 def commit_msg_repo(tmp_path, monkeypatch):
-    """Creates a fake repo layout with .git/COMMIT_EDITMSG and chdirs into it."""
+    """Creates a real temporary git repo, chdirs into it, and returns a function that
+    records a commit with the given message as HEAD (the commit a pre-push validates)."""
     monkeypatch.chdir(tmp_path)
-    (tmp_path / ".git").mkdir()
+    _git("init", "-q")
+    _git("config", "user.email", "test@example.com")
+    _git("config", "user.name", "test")
+    _git("config", "commit.gpgsign", "false")
 
     def write(message):
-        (tmp_path / ".git" / "COMMIT_EDITMSG").write_text(message, encoding="utf-8")
+        _git("commit", "-q", "--allow-empty", "--no-verify", "-m", message)
 
     return write
 
@@ -99,18 +112,46 @@ def test_has_square_brackets():
     assert has_square_brackets("feat: add x") is False
 
 
-def test_read_commit_message_strips_content(tmp_path):
-    """The commit message file content is returned stripped."""
-    msg_file = tmp_path / "COMMIT_EDITMSG"
-    msg_file.write_text("  feat: add feature  \n", encoding="utf-8")
-    assert read_commit_message(str(msg_file)) == "feat: add feature"
+def test_read_head_commit_message_returns_head_stripped(commit_msg_repo):
+    """The message of the HEAD commit is returned stripped."""
+    commit_msg_repo("  feat: add feature  ")
+    assert read_head_commit_message() == "feat: add feature"
 
 
-def test_read_commit_message_missing_file_exits_1(tmp_path):
-    """A missing commit message file exits with code 1."""
+def test_read_head_commit_message_outside_a_repo_exits_1(tmp_path, monkeypatch):
+    """Without a git repository there is no HEAD to validate: exits with code 1."""
+    monkeypatch.chdir(tmp_path)
     with pytest.raises(SystemExit) as exc_info:
-        read_commit_message(str(tmp_path / "missing"))
+        read_head_commit_message()
     assert exc_info.value.code == 1
+
+
+def test_main_accepts_a_merge_commit_with_the_git_default_message(commit_msg_repo, monkeypatch):
+    """A merge commit (two parents) carries the message git generates ("Merge branch ...").
+    It is not the author's conventional commit, so it is accepted as it is, never blocked."""
+    monkeypatch.setattr(sys, "argv", ["control_commit"])
+    commit_msg_repo("✨ feat: base")
+    _git("checkout", "-q", "-b", "side")
+    commit_msg_repo("✨ feat: side work")
+    _git("checkout", "-q", "-")
+    commit_msg_repo("✨ feat: main work")
+    _git("merge", "-q", "--no-edit", "--no-verify", "side")
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+
+
+def test_main_validates_head_not_a_stale_commit_editmsg(commit_msg_repo, monkeypatch, tmp_path):
+    """After a rebase with reword, .git/COMMIT_EDITMSG keeps the editor template ('#'
+    lines) while HEAD is clean. The pre-push check must judge HEAD, the commit pushed."""
+    monkeypatch.setattr(sys, "argv", ["control_commit"])
+    commit_msg_repo("✨ feat: add feature")
+    (tmp_path / ".git" / "COMMIT_EDITMSG").write_text(
+        "✨ feat: add feature\n\n" + REWORD_TEMPLATE, encoding="utf-8"
+    )
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
 
 
 def test_amend_commit_invokes_git(mocker):
