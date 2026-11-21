@@ -19,7 +19,11 @@ import re
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
+
+# CFB moved out of primitives.ciphers.modes (cryptography 49+); same mode, so existing
+# ciphertexts still decrypt.
+from cryptography.hazmat.decrepit.ciphers.modes import CFB
 
 from dotenv import load_dotenv
 
@@ -187,7 +191,7 @@ class CryptoController:
             iv = os.urandom(16)  # 128-bit IV
 
             # Encrypt the plain text with AES
-            cipher = Cipher(algorithms.AES(aes_key), modes.CFB(iv), backend=default_backend())
+            cipher = Cipher(algorithms.AES(aes_key), CFB(iv), backend=default_backend())
             encryptor = cipher.encryptor()
             ciphertext = encryptor.update(plain_text.encode("utf-8")) + encryptor.finalize()
 
@@ -253,7 +257,7 @@ class CryptoController:
             )
 
             # Decrypt the ciphertext with AES key
-            cipher = Cipher(algorithms.AES(aes_key), modes.CFB(iv), backend=default_backend())
+            cipher = Cipher(algorithms.AES(aes_key), CFB(iv), backend=default_backend())
             decryptor = cipher.decryptor()
             decrypted_text = decryptor.update(ciphertext) + decryptor.finalize()
 

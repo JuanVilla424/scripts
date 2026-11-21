@@ -1,3 +1,26 @@
+## [1.1.24] - 2026-11-21
+
+### Bug Fixes
+
+- **core**: apply security dependency updates and import cfb from its new cryptography module (`patch candidate`)
+- **core**: validate the head commit message on pre-push instead of commit_editmsg
+- **deps**: update pylint requirement from ^4.0.5 to ^4.0.6 (#133)
+- **deps**: update pylint requirement from ^4.0.5 to ^4.0.6
+- **deps**: update pre-commit requirement from ^4.0.0 to ^4.6.0 (#134)
+- **deps**: update coverage requirement from ^7.2.5 to ^7.14.1 (#135)
+- **deps**: update cryptography requirement from ^46.0.5 to ^49.0.0 (#136)
+- **deps**: update pytest-mock requirement from >=3.11.0 to >=3.15.1 (#137)
+- **core**: anchor bumpversion search so deps stay fixed
+- **core**: anchor bumpversion search so deps stay fixed
+
+### Chores
+
+- **core**: bump crypto controller deps and use neutral test fixtures
+
+### Other Changes
+
+- ️ refactor(core): move account handover script to aws-scripts and stop tracking logs
+
 ## [1.1.23] - 2026-06-15
 
 ### Chores

@@ -3,14 +3,16 @@
 # Runtime dependencies live in requirements.txt.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Pre-Commit for hook management
-pre-commit>=4.0.0
+# Pre-Commit for hook management (virtualenv / filelock floors set by the security advisories)
+pre-commit>=4.7.0
+virtualenv>=21.14.9
+filelock>=4.2.1
 
 # Linters and formatters
-pylint>=4.0.5
+pylint>=4.0.9
 yamllint>=1.35.0
 isort>=6.0.1
-black>=26.1.0
+black>=26.10.1
 
 # Toml for pyproject.toml management
 toml>=0.10.0
@@ -21,5 +23,6 @@ poetry>=2.4.1
 # Testing
 pytest>=9.0.3
 pytest-cov>=6.0.0
-coverage>=7.2.5
+coverage>=7.17.2
 httpx>=0.28.1
+anyio>=4.14.2
