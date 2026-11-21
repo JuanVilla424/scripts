@@ -59,24 +59,3 @@ jobs:
           flags: unittests
           name: codecov-umbrella
         continue-on-error: true
-      - name: OSSF Scorecard action
-        uses: ossf/scorecard-action@v2.4.0
-        with:
-          results_file: scoreboard-results.json
-          results_format: json
-          #publish_results: true
-        continue-on-error: true
-      - name: List files to verify scoreboard-results.json
-        run: |
-          ls -la scoreboard-results.json
-          cat scoreboard-results.json
-        continue-on-error: true
-      - name: Upload Scorecard Results to Security Scorecards API
-        if: always()
-        run: |
-          curl -X POST \
-            "" \
-            -H "Authorization: Bearer ${{ secrets.SCORECARD_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d @scoreboard-results.json
-        continue-on-error: true
