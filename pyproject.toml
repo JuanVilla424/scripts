@@ -34,7 +34,7 @@ coverage = "^7.17.2"
 # Transitive (httpx, pre-commit): floors set by the security advisories.
 anyio = "^4.14.2"
 virtualenv = "^21.14.9"
-filelock = "^4.2.1"
+filelock = "^4.2.12"
 
 [tool.poetry.extras]
 migrations = ["alembic"]
