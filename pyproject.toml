@@ -18,7 +18,7 @@ cryptography = "^50.0.0"
 requests = "^2.34.2"
 # Transitive (requests): floor set by the security advisories.
 urllib3 = "^2.8.0"
-wheel = ">=0.47.0"
+wheel = ">=0.48.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.7.0"
