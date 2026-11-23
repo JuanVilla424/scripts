@@ -32,7 +32,7 @@ httpx = { version = ">=0.28.1", optional = true }
 pytest-cov = "^6.0.0"
 coverage = "^7.17.2"
 # Transitive (httpx, pre-commit): floors set by the security advisories.
-anyio = "^4.14.2"
+anyio = "^4.16.0"
 virtualenv = "^21.14.9"
 filelock = "^4.2.1"
 
